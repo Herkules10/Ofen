@@ -178,3 +178,4 @@ cython_debug/
 report/*
 !report.pdf 
 !report.tex
+!references.bib

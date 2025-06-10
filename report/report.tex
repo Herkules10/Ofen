@@ -1,9 +1,21 @@
 \documentclass{beamer}
 
+% ------ Packages -------------------------------
+
+\usepackage[utf8]{inputenc}
+\usepackage[
+backend=bibtex,
+style=ieee,
+]{biblatex}
+
+\addbibresource{references.bib}
+
+% ------ Styling for the title slide / report -------
+
 \usetheme{Madrid}
 \usecolortheme{seahorse}
 
-\title[TBD]{TBD}
+\title[Optimizing NNA with GAs and PSOs]{Optimizing neural network architecture using genetic algorithms and particle swarm optimizations}
 
 % \subtitle{}
 
@@ -18,6 +30,8 @@
 
 \date[OMfE 2025]
 {Optimization Methods for Engineers, July 2025}
+
+% ------ Report itself -------------------
 
 \begin{document}
     % Slide 1
@@ -90,7 +104,9 @@
         \frametitle{Conclusion and Discussion}
     \end{frame}
 
-    \begin{frame}
+    \begin{frame}[allowframebreaks]
         \frametitle{References}
+        \nocite{*}
+        \printbibliography
     \end{frame}
 \end{document}
