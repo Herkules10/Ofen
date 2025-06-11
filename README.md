@@ -22,5 +22,6 @@ TODO: Bullet points -> real text
     - [Emilia](https://huggingface.co/datasets/amphion/Emilia-Dataset)
 - Graph / Chemical 
     - [MolTextNet](https://huggingface.co/datasets/liuganghuggingface/moltextnet)
+    - Could use this package [torch-molecule](https://github.com/liugangcode/torch-molecule)
 
 
