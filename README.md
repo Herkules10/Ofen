@@ -24,4 +24,10 @@ TODO: Bullet points -> real text
     - [MolTextNet](https://huggingface.co/datasets/liuganghuggingface/moltextnet)
     - Could use this package [torch-molecule](https://github.com/liugangcode/torch-molecule)
 
+### Python packages
+
+- PySwarms (for Particle Swarm Optimizations)
+- PyGAD (for Genetic Algorithms)
+- SciPy (for Simulated Annealing / Brute Force)
+
 
