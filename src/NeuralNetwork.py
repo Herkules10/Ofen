@@ -2,13 +2,15 @@ import numpy as np
 import torch
 import torch.nn as nn
 import config
+from itertools import count
 
 # tuneable parameters
 
 # Example for the types of layers, subject to change/expand
 layer_type_dict = { 0: "fully_connected",
                     1: "convolutional",
-                    2: "batch_normalization"}
+                    2: "batch_normalization",
+                    3: "dropout"}
 
 
 class LayerParams():
@@ -30,11 +32,32 @@ class BatchNormParams(LayerParams):
     def __init__(self):
         pass
 
+class DropoutParams(LayerParams):
+    def __init__(self, dropout_chance):
+        self.dropout_chance = dropout_chance
+
 class LayerEncoding():
-    def __init__(self, active: bool, layer_type: int, params: LayerParams):
-        self.active = active
+    def __init__(self, layer_type: int, params: LayerParams):
+        # self.active = active
         self.layer_type = layer_type
         self.params = params
+
+class NetworkGenome():
+    _ids = count(0)
+    def __init__(self, layer_list: list[LayerEncoding]):
+        self.layer_list = layer_list
+        # unique ID of genome
+        self.id = next(self._ids)
+        assert(len(self.layer_list) <= config.MAX_LAYERS)
+    
+    def __str__(self):
+        # For custom print() behaviour
+        title = f"Genome with ID: {self.id} \n"
+        body = ""
+        for index, layer in enumerate(self.layer_list):
+            body += f"layer with index: {index} \n"
+            body += f"type: {layer_type_dict[layer.layer_type]} \n"
+        return title + body
 
 # Custom module for reshaping between FC and Conv
 class ReshapeLayer(nn.Module):
@@ -73,22 +96,23 @@ class ReshapeLayer(nn.Module):
         return x.view(batch_size, *self.output_shape)
 
 class NeuralNetwork(nn.Module):
-    def __init__(self, input_shape, output_shape, layer_encodings: list[LayerEncoding]):
+    def __init__(self, input_shape, output_shape, genome: NetworkGenome):
         super(NeuralNetwork, self).__init__()
         self.first_input_shape = input_shape
         self.output_shape = output_shape
         self.max_layers = config.MAX_LAYERS
-        self.layer_encodings = [le for le in layer_encodings if le.active][:config.MAX_LAYERS]
+        self.layer_encodings = genome.layer_list
         
         # Decompose the complex network building into separate steps
         self.all_layers = nn.ModuleList()  # Contains all layers including transitions
         self.layer_types = []  # Tracks the type of each layer for debugging
         
+        '''
         # Determine if the first layer is convolutional to handle input reshaping later
         self.first_layer_is_conv = False
         if len(self.layer_encodings) > 0 and layer_type_dict[self.layer_encodings[0].layer_type] == "convolutional":
             self.first_layer_is_conv = True
-        
+        '''
         self.build_network()
         
         # Print the network structure for debugging
@@ -172,8 +196,11 @@ class NeuralNetwork(nn.Module):
                     self.all_layers.append(bn_layer)
                     self.layer_types.append("batch_norm_1d")
                 
-                # Shape stays the same
-            
+            elif layer_type == "dropout":
+                drop_layer = nn.Dropout(encoding.params.dropout_chance)
+                self.all_layers.append(drop_layer)
+                self.layer_types.append("dropout")
+
             # Update prev_layer_type for next iteration
             prev_layer_type = layer_type
             
