@@ -15,7 +15,7 @@ style=ieee,
 \usetheme{Madrid}
 \usecolortheme{seahorse}
 
-\title[Optimizing NNA with GAs, PSOs and SA]{Optimizing neural network architecture using genetic algorithms, particle swarm optimizations, and simulated annealing}
+\title[Optimizing NNA with GAs, PSOs and SA]{Optimizing neural network architecture using metaheuristic algorithms}
 
 % \subtitle{}
 
@@ -49,19 +49,34 @@ style=ieee,
     \begin{frame}
         \frametitle{Introduction - Problem Description}
         \begin{itemize}
-            \item \textbf{Given} a dataset with $n$ data points $d^{(1)}, d^{(2)}, ..., d^{(n)} \in \mathbb{R}^m$, where $n, m \in \mathbb{N}$ \\
-                  \textbf{Find} a model $\mathcal{M}$ 
-                  \begin{align*}
-                    f\left(\right) := 
-                  \end{align*}
-            \item \textbf{Example:}
-            \item \textbf{Motivation} (Optimization of NNA):   
+            \item \textbf{Given} an image-based dataset with $n$ data points $d^{(1)}, d^{(2)}, ..., d^{(n)} \in \mathbb{R}^{H \times W \times C}$, where $H, W, C$ represent height, width and channels respectively, and $n \in \mathbb{N}$ represents the number of samples.
+               \item \textbf{Find} $\alpha = {(\alpha_1, \alpha_2, ..., \alpha_n)}^\top \in \mathcal{D}^n$ which minimizes 
+                \begin{align*}
+                    f\left(\alpha, \mathcal{D}\right) := \lambda_1 \cdot \text{NetworkSize}(\alpha) - \lambda_2 \cdot \text{Accuracy}(\alpha, \mathcal{D})
+                \end{align*} \\
+                Where: \\ 
+                \begin{itemize}
+                    \item $\alpha$ represents the network architecture parameters
+                    \item $\mathcal{D}$ is the dataset
+                    \item $\lambda_1, \lambda_2$ are weighting factors balancing size vs. accuracy
+                    \item NetworkSize$(\alpha)$ counts the total number of parameters
+                    \item Accuracy$(\alpha, \mathcal{D})$ is the classification accuracy on dataset $\mathcal{D}$
+                \end{itemize}   
+        \end{itemize}
+    \end{frame}
+
+
+    % Slide 3a
+    \begin{frame}
+        \frametitle{Introduction - Motivation}
+        \begin{itemize}
+            \item \textbf{Motivation} (Optimization of NNA):
         \end{itemize}
     \end{frame}
 
     % Slide 4
     \begin{frame}
-        \frametitle{Introduction}
+        \frametitle{Introduction - Architecture }
         \begin{itemize}
             \item Non-linear cost function $f\left(\right) = $
             \item Discrete / Continous solution space $D_s = \{\}$
