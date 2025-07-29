@@ -2,9 +2,11 @@ import numpy as np
 import random
 import math
 import copy
-import time
-import torch
 from typing import Tuple, Dict, List, Optional
+import sys
+import os
+import torch
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from architecture_base import NetworkArchitecture, ArchitectureGenerator, LayerConfig, LayerType, ActivationType
 from training_utils import FitnessEvaluator, ExperimentLogger
 
@@ -157,7 +159,7 @@ class SimulatedAnnealing:
                  input_shape: Tuple[int, ...],
                  num_classes: int,
                  initial_temperature: float = 100.0,
-                 cooling_rate: float = 0.95,
+                 cooling_rate: float = 0.8,
                  min_temperature: float = 0.01,
                  max_iterations: int = 1000,
                  max_layers: int = 10):
@@ -189,27 +191,31 @@ class SimulatedAnnealing:
     
     def run(self) -> Tuple[NetworkArchitecture, float]:
         """Run simulated annealing algorithm."""
-        print(f"🌡️  Starting Simulated Annealing")
-        print(f"   📋 Parameters: T₀={self.initial_temperature}, α={self.cooling_rate}, T_min={self.min_temperature}")
-        print(f"   🔄 Max iterations: {self.max_iterations}, Max layers: {self.max_layers}")
+        print(f"Starting Simulated Annealing")
+        print(f"Initial temperature: {self.initial_temperature}")
+        print(f"Cooling rate: {self.cooling_rate}")
+        print(f"Max iterations: {self.max_iterations}")
         
         # Initialize with random architecture
         self._initialize()
         
         iteration = 0
         temperature_updates = 0
-        start_time = time.time()
+        
+        # Calculate logging frequency based on max_iterations
+        # For short runs, log more frequently to capture convergence
+        log_frequency = max(1, min(50, self.max_iterations // 10))
+        print_frequency = max(1, min(50, self.max_iterations // 5))
         
         while (iteration < self.max_iterations and 
                self.temperature > self.min_temperature):
             
-            if iteration % 50 == 0:
-                elapsed = time.time() - start_time
-                print(f"\n🔄 Iteration {iteration + 1}/{self.max_iterations} | Elapsed: {elapsed:.1f}s")
-                print(f"   🌡️  Temperature: {self.temperature:.4f}")
-                print(f"   📊 Current fitness: {self.current_fitness:.4f} | Best: {self.best_fitness:.4f}")
-                acceptance_rate = self.accepted_moves / (self.accepted_moves + self.rejected_moves) if (self.accepted_moves + self.rejected_moves) > 0 else 0
-                print(f"   ✅ Accepted/Rejected: {self.accepted_moves}/{self.rejected_moves} (rate: {acceptance_rate:.3f})")
+            if iteration % print_frequency == 0:
+                print(f"Iteration {iteration + 1}/{self.max_iterations}")
+                print(f"  Temperature: {self.temperature:.4f}")
+                print(f"  Current fitness: {self.current_fitness:.4f}")
+                print(f"  Best fitness: {self.best_fitness:.4f}")
+                print(f"  Accepted/Rejected: {self.accepted_moves}/{self.rejected_moves}")
             
             # Generate neighbor
             neighbor_architecture = self.neighborhood.get_neighbor(self.current_architecture)
@@ -228,8 +234,6 @@ class SimulatedAnnealing:
                 if neighbor_fitness > self.best_fitness:
                     self.best_fitness = neighbor_fitness
                     self.best_architecture = neighbor_architecture.copy()
-                    if iteration % 50 != 0:  # Don't spam if we just printed stats
-                        print(f"      🎯 New best found! Fitness: {self.best_fitness:.4f}")
             else:
                 self.rejected_moves += 1
             
@@ -238,32 +242,31 @@ class SimulatedAnnealing:
                 self.temperature *= self.cooling_rate
                 temperature_updates += 1
             
-            # Log progress periodically
-            if iteration % 50 == 0:
+            # Log progress periodically - adaptive frequency for convergence tracking
+            if iteration % log_frequency == 0:
                 fitness_list = [self.current_fitness]  # Single fitness for SA
                 self.logger.log_generation(iteration, fitness_list,
                                          self.best_architecture, self.best_fitness)
             
             iteration += 1
         
-        total_time = time.time() - start_time
-        final_acceptance_rate = self.accepted_moves/(self.accepted_moves + self.rejected_moves) if (self.accepted_moves + self.rejected_moves) > 0 else 0
+        # Final logging to ensure the last state is captured
+        fitness_list = [self.current_fitness]
+        self.logger.log_generation(iteration, fitness_list,
+                                 self.best_architecture, self.best_fitness)
         
-        print(f"\n✅ Simulated Annealing completed in {total_time:.1f}s:")
-        print(f"   🔄 Total iterations: {iteration}")
-        print(f"   🌡️  Final temperature: {self.temperature:.6f}")
-        print(f"   ✅ Accepted moves: {self.accepted_moves}")
-        print(f"   ❌ Rejected moves: {self.rejected_moves}")
-        print(f"   📊 Acceptance rate: {final_acceptance_rate:.3f}")
-        print(f"   🏆 Best fitness: {self.best_fitness:.4f}")
+        print(f"\nSimulated Annealing completed:")
+        print(f"Total iterations: {iteration}")
+        print(f"Final temperature: {self.temperature:.6f}")
+        print(f"Accepted moves: {self.accepted_moves}")
+        print(f"Rejected moves: {self.rejected_moves}")
+        print(f"Acceptance rate: {self.accepted_moves/(self.accepted_moves + self.rejected_moves):.3f}")
         
         return self.best_architecture, self.best_fitness
     
     def _initialize(self):
         """Initialize algorithm with random architecture."""
-        print("   🎲 Initializing with random architecture...")
-        init_start = time.time()
-        
+        print("Initializing with random architecture...")
         self.current_architecture = self.generator.generate_random_architecture()
         
         # Evaluate initial architecture
@@ -274,11 +277,14 @@ class SimulatedAnnealing:
         self.best_architecture = self.current_architecture.copy()
         self.best_fitness = self.current_fitness
         
-        init_time = time.time() - init_start
-        print(f"   ✅ Initialization completed in {init_time:.1f}s")
-        print(f"      📊 Initial fitness: {self.current_fitness:.4f}")
-        print(f"      🏗️  Initial layers: {len(self.current_architecture.layers)}")
-        print(f"      📊 Initial parameters: {self.current_architecture.get_parameter_count():,}")
+        # Log initial state
+        fitness_list = [self.current_fitness]
+        self.logger.log_generation(0, fitness_list,
+                                 self.best_architecture, self.best_fitness)
+        
+        print(f"Initial fitness: {self.current_fitness:.4f}")
+        print(f"Initial layers: {len(self.current_architecture.layers)}")
+        print(f"Initial parameters: {self.current_architecture.get_parameter_count():,}")
     
     def _accept_neighbor(self, neighbor_fitness: float) -> bool:
         """Decide whether to accept a neighbor solution."""
@@ -324,10 +330,15 @@ class AdaptiveSimulatedAnnealing(SimulatedAnnealing):
         
         iteration = 0
         
+        # Calculate logging frequency based on max_iterations
+        # For short runs, log more frequently to capture convergence
+        log_frequency = max(1, min(50, self.max_iterations // 10))
+        print_frequency = max(1, min(50, self.max_iterations // 5))
+        
         while (iteration < self.max_iterations and 
                self.temperature > self.min_temperature):
             
-            if iteration % 50 == 0:
+            if iteration % print_frequency == 0:
                 print(f"Iteration {iteration + 1}/{self.max_iterations}")
                 print(f"  Temperature: {self.temperature:.4f}")
                 print(f"  Current fitness: {self.current_fitness:.4f}")
@@ -377,13 +388,18 @@ class AdaptiveSimulatedAnnealing(SimulatedAnnealing):
                 self.temperature *= self.reheat_factor
                 self.no_improvement_count = 0
             
-            # Logging
-            if iteration % 50 == 0:
+            # Logging - adaptive frequency for convergence tracking
+            if iteration % log_frequency == 0:
                 fitness_list = [self.current_fitness]
                 self.logger.log_generation(iteration, fitness_list,
                                          self.best_architecture, self.best_fitness)
             
             iteration += 1
+        
+        # Final logging to ensure the last state is captured
+        fitness_list = [self.current_fitness]
+        self.logger.log_generation(iteration, fitness_list,
+                                 self.best_architecture, self.best_fitness)
         
         return self.best_architecture, self.best_fitness
     
@@ -414,30 +430,26 @@ class AdaptiveSimulatedAnnealing(SimulatedAnnealing):
 
 def run_simulated_annealing(dataset_name: str = "cifar10", 
                            algorithm_type: str = "SA",
-                           device: str = None,
+                           train_split: float = 1.0,
                            **kwargs) -> Dict:
     """Run simulated annealing experiment."""
-    
-    # Set device
-    if device is None:
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"🖥️  Using device: {device}")
     
     # Load dataset
     from training_utils import DatasetLoader
     
     if dataset_name.lower() == "cifar10":
-        train_loader, val_loader, test_loader = DatasetLoader.load_cifar10()
+        train_loader, val_loader, test_loader = DatasetLoader.load_cifar10(train_split=train_split)
         input_shape = (3, 32, 32)
         num_classes = 10
     elif dataset_name.lower() == "mnist":
-        train_loader, val_loader, test_loader = DatasetLoader.load_mnist()
+        train_loader, val_loader, test_loader = DatasetLoader.load_mnist(train_split=train_split)
         input_shape = (1, 28, 28)
         num_classes = 10
     else:
         raise ValueError(f"Unsupported dataset: {dataset_name}")
     
-    # Setup fitness evaluator with device
+    # Setup fitness evaluator with GPU support
+    device = "cuda" if torch.cuda.is_available() else "cpu"
     fitness_evaluator = FitnessEvaluator(train_loader, val_loader, device=device)
     
     # Default parameters
@@ -468,7 +480,7 @@ def run_simulated_annealing(dataset_name: str = "cifar10",
     print(f"Running {algorithm_type} on {dataset_name}")
     best_architecture, best_fitness = algorithm.run()
     
-    # Final evaluation on test set
+    # Final evaluation on test set with GPU support
     from training_utils import NetworkTrainer
     trainer = NetworkTrainer(device=device)
     test_results = trainer.train_and_evaluate(

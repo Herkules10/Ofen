@@ -13,9 +13,9 @@ import torch
 import numpy as np
 
 # Import algorithm implementations
-from genetic_algorithm import run_genetic_algorithm
-from particle_swarm_optimization import run_particle_swarm_optimization
-from simulated_annealing import run_simulated_annealing
+from algorithms.genetic_algorithm import run_genetic_algorithm
+from algorithms.particle_swarm_optimization import run_particle_swarm_optimization
+from algorithms.simulated_annealing import run_simulated_annealing
 from training_utils import DatasetLoader
 
 class ExperimentSuite:
@@ -24,10 +24,12 @@ class ExperimentSuite:
     def __init__(self, 
                  dataset_name: str = "cifar10",
                  output_dir: str = "results",
-                 num_runs: int = 1):
+                 num_runs: int = 1,
+                 train_split: float = 1.0):
         self.dataset_name = dataset_name
         self.output_dir = output_dir
         self.num_runs = num_runs
+        self.train_split = train_split
         
         # Create output directory
         os.makedirs(output_dir, exist_ok=True)
@@ -71,7 +73,9 @@ class ExperimentSuite:
                     'w': 0.7,
                     'c1': 2.0,
                     'c2': 2.0,
-                    'max_layers': 8
+                    'max_layers': 8,
+                    'use_parallel': True,
+                    'parallel_batch_size': 4
                 }
             },
             'SA': {
@@ -105,42 +109,30 @@ class ExperimentSuite:
     
     def run_all_experiments(self):
         """Run all algorithms multiple times and collect results."""
-        print(f"🚀 Starting experiment suite on {self.dataset_name.upper()}")
-        print(f"   📊 Number of runs per algorithm: {self.num_runs}")
-        print(f"   📁 Output directory: {self.output_dir}")
-        print(f"   🖥️  GPU available: {torch.cuda.is_available()}")
-        print(f"   🧮 PyTorch version: {torch.__version__}")
-        print("="*80)
-        
-        total_experiments = len(self.algorithms) * self.num_runs
-        completed_experiments = 0
-        experiment_start_time = time.time()
+        print(f"Starting experiment suite on {self.dataset_name}")
+        print(f"Number of runs per algorithm: {self.num_runs}")
+        print(f"Output directory: {self.output_dir}")
+        print(f"Available GPU: {torch.cuda.is_available()}")
+        print("-" * 60)
         
         for algorithm_name, config in self.algorithms.items():
-            print(f"\n{'🧬' if 'GA' in algorithm_name else '🦋' if 'PSO' in algorithm_name else '🌡️'} {algorithm_name} {'='*60}")
-            print(f"   📋 Parameters: {config['params']}")
+            print(f"\n{'='*20} Running {algorithm_name} {'='*20}")
             
             algorithm_results = []
-            algorithm_start_time = time.time()
             
             for run_id in range(self.num_runs):
-                print(f"\n--- 🔄 Run {run_id + 1}/{self.num_runs} ---")
-                run_start_time = time.time()
+                print(f"\n--- Run {run_id + 1}/{self.num_runs} ---")
                 
                 try:
                     # Set random seeds for reproducibility
                     torch.manual_seed(42 + run_id)
                     np.random.seed(42 + run_id)
-                    print(f"   🎲 Random seed set to: {42 + run_id}")
-                    
-                    # Detect and set device
-                    device = "cuda" if torch.cuda.is_available() else "cpu"
                     
                     # Run algorithm
                     start_time = time.time()
                     result = config['function'](
                         dataset_name=self.dataset_name,
-                        device=device,
+                        train_split=self.train_split,
                         **config['params']
                     )
                     end_time = time.time()
@@ -150,7 +142,6 @@ class ExperimentSuite:
                     result['run_id'] = run_id
                     
                     algorithm_results.append(result)
-                    completed_experiments += 1
                     
                     # Save individual result
                     filename = f"{algorithm_name}_{self.dataset_name}_run_{run_id}.pkl"
@@ -158,21 +149,15 @@ class ExperimentSuite:
                     with open(filepath, 'wb') as f:
                         pickle.dump(result, f)
                     
-                    run_time = time.time() - run_start_time
-                    total_elapsed = time.time() - experiment_start_time
-                    eta = (total_elapsed / completed_experiments) * (total_experiments - completed_experiments)
-                    
-                    print(f"   ✅ Run {run_id + 1} completed in {run_time:.1f}s")
-                    print(f"      🏆 Best fitness: {result['best_fitness']:.4f}")
-                    print(f"      🎯 Test accuracy: {result['test_accuracy']:.2f}%")
-                    print(f"      📊 Parameters: {result['parameter_count']:,}")
-                    print(f"      📈 Progress: {completed_experiments}/{total_experiments} | ETA: {eta/60:.1f}min")
+                    print(f"Run {run_id + 1} completed in {end_time - start_time:.1f}s")
+                    print(f"Best fitness: {result['best_fitness']:.4f}")
+                    print(f"Test accuracy: {result['test_accuracy']:.2f}%")
+                    print(f"Parameters: {result['parameter_count']:,}")
                     
                 except Exception as e:
-                    print(f"   ❌ Run {run_id + 1} failed: {e}")
+                    print(f"Run {run_id + 1} failed: {e}")
                     continue
             
-            algorithm_time = time.time() - algorithm_start_time
             self.results[algorithm_name] = algorithm_results
             
             # Save aggregated results for this algorithm
@@ -181,23 +166,18 @@ class ExperimentSuite:
             with open(agg_filepath, 'wb') as f:
                 pickle.dump(algorithm_results, f)
             
-            success_rate = len(algorithm_results) / self.num_runs
-            print(f"\n✅ {algorithm_name} completed in {algorithm_time/60:.1f}min: {len(algorithm_results)}/{self.num_runs} successful runs (success rate: {success_rate:.1%})")
-        
-        total_time = time.time() - experiment_start_time
-        print(f"\n🏁 All experiments completed in {total_time/3600:.1f} hours!")
+            print(f"\n{algorithm_name} completed: {len(algorithm_results)}/{self.num_runs} successful runs")
     
     def generate_summary(self):
         """Generate summary statistics for all algorithms."""
-        print("\n" + "🏆"*80)
-        print("                           EXPERIMENT SUMMARY")
-        print("🏆"*80)
+        print("\n" + "="*60)
+        print("EXPERIMENT SUMMARY")
+        print("="*60)
         
         summary_data = {}
         
         for algorithm_name, results in self.results.items():
             if not results:
-                print(f"❌ {algorithm_name}: No successful runs")
                 continue
             
             # Extract metrics
@@ -237,40 +217,18 @@ class ExperimentSuite:
             
             summary_data[algorithm_name] = stats
             
-            # Print formatted results
-            emoji = "🧬" if "GA" in algorithm_name else "🦋" if "PSO" in algorithm_name else "🌡️"
-            print(f"\n{emoji} {algorithm_name} Results ({len(results)} runs):")
-            print(f"   🎯 Test Accuracy: {stats['test_accuracy']['mean']:.2f}% ± {stats['test_accuracy']['std']:.2f}% (range: {stats['test_accuracy']['min']:.2f}%-{stats['test_accuracy']['max']:.2f}%)")
-            print(f"   🏆 Best Fitness:  {stats['best_fitness']['mean']:.4f} ± {stats['best_fitness']['std']:.4f} (range: {stats['best_fitness']['min']:.4f}-{stats['best_fitness']['max']:.4f})")
-            print(f"   📊 Parameters:    {stats['parameter_count']['mean']:,.0f} ± {stats['parameter_count']['std']:,.0f} (range: {stats['parameter_count']['min']:,.0f}-{stats['parameter_count']['max']:,.0f})")
-            print(f"   ⏱️  Runtime:       {stats['runtime']['mean']/60:.1f}min ± {stats['runtime']['std']/60:.1f}min (range: {stats['runtime']['min']/60:.1f}-{stats['runtime']['max']/60:.1f}min)")
+            # Print summary
+            print(f"\n{algorithm_name} Results ({len(results)} runs):")
+            print(f"  Test Accuracy: {stats['test_accuracy']['mean']:.2f}% ± {stats['test_accuracy']['std']:.2f}%")
+            print(f"  Best Fitness:  {stats['best_fitness']['mean']:.4f} ± {stats['best_fitness']['std']:.4f}")
+            print(f"  Parameters:    {stats['parameter_count']['mean']:.0f} ± {stats['parameter_count']['std']:.0f}")
+            print(f"  Runtime:       {stats['runtime']['mean']:.1f}s ± {stats['runtime']['std']:.1f}s")
         
-        # Find best performing algorithm
-        if summary_data:
-            best_algo = max(summary_data.keys(), 
-                           key=lambda x: summary_data[x]['test_accuracy']['mean'])
-            best_acc = summary_data[best_algo]['test_accuracy']['mean']
-            
-            print(f"\n🥇 Best Performing Algorithm: {best_algo} with {best_acc:.2f}% average test accuracy")
-            
-            # Efficiency analysis (accuracy per parameter)
-            print(f"\n📈 Efficiency Analysis (Accuracy/Million Parameters):")
-            for algo_name, stats in summary_data.items():
-                efficiency = stats['test_accuracy']['mean'] / (stats['parameter_count']['mean'] / 1_000_000)
-                emoji = "🧬" if "GA" in algo_name else "🦋" if "PSO" in algo_name else "🌡️"
-                print(f"   {emoji} {algo_name}: {efficiency:.2f}")
-        
-        return summary_data
-    
-    def save_summary(self, summary_data: Dict):
-        """Save summary to file."""
+        # Save summary
         summary_filename = f"experiment_summary_{self.dataset_name}.pkl"
         summary_filepath = os.path.join(self.output_dir, summary_filename)
-        
         with open(summary_filepath, 'wb') as f:
             pickle.dump(summary_data, f)
-        
-        print(f"\n💾 Summary saved to: {summary_filepath}")
         
         # Create ranking
         if len(summary_data) > 1:
@@ -299,27 +257,29 @@ class ExperimentSuite:
         
         return summary_data
 
-def run_baseline_comparison(device: str = None):
+def run_baseline_comparison(dataset_name="cifar10", train_split=1.0):
     """Run baseline random search for comparison."""
     print("\n" + "="*20 + " Running Baseline " + "="*20)
-    
-    # Set device
-    if device is None:
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"🖥️  Using device: {device}")
     
     from architecture_base import ArchitectureGenerator
     from training_utils import FitnessEvaluator, DatasetLoader, NetworkTrainer
     
-    # Load dataset
-    train_loader, val_loader, test_loader = DatasetLoader.load_cifar10()
-    input_shape = (3, 32, 32)
-    num_classes = 10
+    # Load dataset based on dataset_name
+    if dataset_name.lower() == "cifar10":
+        train_loader, val_loader, test_loader = DatasetLoader.load_cifar10(train_split=train_split)
+        input_shape = (3, 32, 32)
+        num_classes = 10
+    elif dataset_name.lower() == "mnist":
+        train_loader, val_loader, test_loader = DatasetLoader.load_mnist(train_split=train_split)
+        input_shape = (1, 28, 28)
+        num_classes = 10
+    else:
+        raise ValueError(f"Unsupported dataset: {dataset_name}")
     
-    # Setup with device
-    fitness_evaluator = FitnessEvaluator(train_loader, val_loader, device=device)
+    # Setup
+    fitness_evaluator = FitnessEvaluator(train_loader, val_loader, device="cpu")
     generator = ArchitectureGenerator(input_shape, num_classes, max_layers=8)
-    trainer = NetworkTrainer(device=device)
+    trainer = NetworkTrainer()
     
     # Random search
     num_random_samples = 50
@@ -378,8 +338,14 @@ def main():
                         help='Include random search baseline')
     parser.add_argument('--quick', action='store_true',
                         help='Run with reduced parameters for quick testing')
+    parser.add_argument('--train_split', type=float, default=1.0,
+                        help='Fraction of training data to use (0.0-1.0). Use smaller values for testing with reduced datasets.')
     
     args = parser.parse_args()
+    
+    # Validate train_split argument
+    if not (0.0 < args.train_split <= 1.0):
+        raise ValueError("train_split must be between 0.0 and 1.0")
     
     # Handle algorithm selection
     if 'all' in args.algorithms:
@@ -391,7 +357,8 @@ def main():
     experiment = ExperimentSuite(
         dataset_name=args.dataset,
         output_dir=args.output_dir,
-        num_runs=args.num_runs
+        num_runs=args.num_runs,
+        train_split=args.train_split
     )
     
     # Filter algorithms based on selection
@@ -404,15 +371,15 @@ def main():
         for alg_config in experiment.algorithms.values():
             params = alg_config['params']
             if 'num_generations' in params:
-                params['num_generations'] = min(10, params['num_generations'])
+                params['num_generations'] = min(30, params['num_generations'])
             if 'num_iterations' in params:
-                params['num_iterations'] = min(20, params['num_iterations'])
+                params['num_iterations'] = min(30, params['num_iterations'])
             if 'max_iterations' in params:
-                params['max_iterations'] = min(100, params['max_iterations'])
+                params['max_iterations'] = min(10, params['max_iterations'])
             if 'population_size' in params:
-                params['population_size'] = min(10, params['population_size'])
+                params['population_size'] = min(30, params['population_size'])
             if 'swarm_size' in params:
-                params['swarm_size'] = min(10, params['swarm_size'])
+                params['swarm_size'] = min(30, params['swarm_size'])
     
     try:
         # Run experiments
@@ -423,8 +390,7 @@ def main():
         
         # Run baseline if requested
         if args.include_baseline:
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-            baseline_result = run_baseline_comparison(device=device)
+            baseline_result = run_baseline_comparison(args.dataset, args.train_split)
             
             # Save baseline result
             baseline_filename = f"baseline_{args.dataset}.pkl"
@@ -442,7 +408,7 @@ def main():
         for alg_name, stats in summary.items():
             print(f"{alg_name:<12} "
                   f"{stats['test_accuracy']['mean']:.2f} ± {stats['test_accuracy']['std']:.2f}   "
-                  f"{stats['parameter_count']['mean']:.0f:<12} "
+                  f"{stats['parameter_count']['mean']:<12.0f} "
                   f"{stats['runtime']['mean']:.1f} ± {stats['runtime']['std']:.1f}   "
                   f"{stats['best_fitness']['mean']:.4f}")
         

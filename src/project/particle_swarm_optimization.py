@@ -1,7 +1,9 @@
 import numpy as np
 import random
-import time
 from typing import List, Tuple, Dict, Optional
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from architecture_base import NetworkArchitecture, LayerConfig, LayerType, ActivationType
 from training_utils import FitnessEvaluator, ExperimentLogger
 import torch
@@ -142,12 +144,18 @@ class ArchitectureDecoder:
     def _decode_layer(self, position: np.ndarray, layer_idx: int, 
                      architecture: NetworkArchitecture) -> Optional[LayerConfig]:
         """Decode a single layer from position vector."""
-        # Get layer type probabilities
+        # Check bounds for type index
         type_start_idx = 1 + layer_idx
+        if type_start_idx >= len(position):
+            return None
         type_prob = position[type_start_idx]
         
-        # Get parameter values
+        # Check bounds for parameter indices
         param_start_idx = 1 + self.max_layers + layer_idx * self.param_dims_per_layer
+        if param_start_idx + 3 >= len(position):
+            return None
+            
+        # Get parameter values
         param1 = position[param_start_idx]      # filters/units
         param2 = position[param_start_idx + 1]  # kernel_size
         param3 = position[param_start_idx + 2]  # stride
@@ -171,10 +179,15 @@ class ArchitectureDecoder:
             kernel_options = [3, 5, 7]
             stride_options = [1, 2]
             
+            # Safe indexing to prevent out of bounds errors
+            filters_idx = min(int(param1 * len(filters_options)), len(filters_options) - 1)
+            kernel_idx = min(int(param2 * len(kernel_options)), len(kernel_options) - 1)
+            stride_idx = min(int(param3 * len(stride_options)), len(stride_options) - 1)
+            
             return LayerConfig(LayerType.CONV2D, {
-                'filters': filters_options[int(param1 * len(filters_options))],
-                'kernel_size': kernel_options[int(param2 * len(kernel_options))],
-                'stride': stride_options[int(param3 * len(stride_options))],
+                'filters': filters_options[filters_idx],
+                'kernel_size': kernel_options[kernel_idx],
+                'stride': stride_options[stride_idx],
                 'padding': 1
             })
         
@@ -183,17 +196,23 @@ class ArchitectureDecoder:
             kernel_options = [3, 5, 7]
             stride_options = [1, 2]
             
+            # Safe indexing to prevent out of bounds errors
+            filters_idx = min(int(param1 * len(filters_options)), len(filters_options) - 1)
+            kernel_idx = min(int(param2 * len(kernel_options)), len(kernel_options) - 1)
+            stride_idx = min(int(param3 * len(stride_options)), len(stride_options) - 1)
+            
             return LayerConfig(LayerType.CONV1D, {
-                'filters': filters_options[int(param1 * len(filters_options))],
-                'kernel_size': kernel_options[int(param2 * len(kernel_options))],
-                'stride': stride_options[int(param3 * len(stride_options))],
+                'filters': filters_options[filters_idx],
+                'kernel_size': kernel_options[kernel_idx],
+                'stride': stride_options[stride_idx],
                 'padding': 1
             })
         
         elif layer_type == LayerType.FC:
             units_options = [64, 128, 256, 512, 1024]
+            units_idx = min(int(param1 * len(units_options)), len(units_options) - 1)
             return LayerConfig(LayerType.FC, {
-                'units': units_options[int(param1 * len(units_options))]
+                'units': units_options[units_idx]
             })
         
         elif layer_type == LayerType.BATCHNORM:
@@ -201,8 +220,9 @@ class ArchitectureDecoder:
         
         elif layer_type == LayerType.MAXPOOL:
             pool_options = [2, 3, 4]
+            pool_idx = min(int(param2 * len(pool_options)), len(pool_options) - 1)
             return LayerConfig(LayerType.MAXPOOL, {
-                'pool_size': pool_options[int(param2 * len(pool_options))]
+                'pool_size': pool_options[pool_idx]
             })
         
         elif layer_type == LayerType.DROPOUT:
@@ -282,28 +302,22 @@ class ParticleSwarmOptimization:
     
     def _initialize_swarm(self):
         """Initialize particle swarm."""
-        print(f"🚀 Initializing swarm with {self.swarm_size} particles")
-        init_start = time.time()
+        print(f"Initializing swarm with {self.swarm_size} particles")
         self.swarm = []
         
         for i in range(self.swarm_size):
-            if i % 10 == 0 or i == self.swarm_size - 1:
-                print(f"   Creating particle {i + 1}/{self.swarm_size}")
+            if i % 10 == 0:
+                print(f"  Creating particle {i + 1}/{self.swarm_size}")
             
             particle = Particle(self.decoder.position_dim, self.decoder.bounds)
             self.swarm.append(particle)
-        
-        init_time = time.time() - init_start
-        print(f"   ✅ Swarm initialized in {init_time:.1f}s")
     
     def run(self) -> Tuple[NetworkArchitecture, float]:
         """Run PSO algorithm."""
-        print(f"🦋 Starting PSO with {self.swarm_size} particles for {self.num_iterations} iterations")
-        print(f"   📋 Parameters: w={self.w}, c1={self.c1}, c2={self.c2}, max_layers={self.max_layers}")
+        print(f"Starting PSO with {self.swarm_size} particles for {self.num_iterations} iterations")
         
         for iteration in range(self.num_iterations):
-            print(f"\n🔄 Iteration {iteration + 1}/{self.num_iterations}")
-            iter_start = time.time()
+            print(f"Iteration {iteration + 1}/{self.num_iterations}")
             
             # Evaluate all particles
             self._evaluate_swarm()
@@ -313,33 +327,35 @@ class ParticleSwarmOptimization:
             
             # Log results
             fitness_scores = [p.fitness for p in self.swarm]
-            avg_fitness = np.mean(fitness_scores)
-            std_fitness = np.std(fitness_scores)
-            
             self.logger.log_generation(iteration, fitness_scores,
                                      self.global_best_architecture, self.global_best_fitness)
             
-            iter_time = time.time() - iter_start
-            print(f"   📊 Best fitness: {self.global_best_fitness:.4f} | Avg: {avg_fitness:.4f} ± {std_fitness:.4f}")
-            print(f"   🏗️  Best architecture: {len(self.global_best_architecture.layers)} layers, {self.global_best_architecture.get_parameter_count():,} params")
-            print(f"   ⏱️  Iteration time: {iter_time:.1f}s")
+            print(f"  Best fitness: {self.global_best_fitness:.4f}")
+            print(f"  Avg fitness: {np.mean(fitness_scores):.4f}")
+            print(f"  Best arch layers: {len(self.global_best_architecture.layers)}")
+            print(f"  Best arch params: {self.global_best_architecture.get_parameter_count()}")
             
             # Update particle dynamics
             if iteration < self.num_iterations - 1:
-                print(f"   🔄 Updating particle dynamics...")
                 self._update_swarm()
         
-        print(f"\n✅ PSO completed! Best fitness: {self.global_best_fitness:.4f}")
         return self.global_best_architecture, self.global_best_fitness
     
     def _evaluate_swarm(self):
         """Evaluate fitness for all particles."""
-        print("   🎯 Evaluating swarm fitness...")
-        eval_start = time.time()
+        print("  Evaluating swarm fitness...")
         
+        # Check if fitness evaluator supports parallel evaluation
+        if hasattr(self.fitness_evaluator, 'evaluate_population_parallel'):
+            self._evaluate_swarm_parallel()
+        else:
+            self._evaluate_swarm_sequential()
+    
+    def _evaluate_swarm_sequential(self):
+        """Evaluate fitness for all particles sequentially."""
         for i, particle in enumerate(self.swarm):
-            if i % 5 == 0 or i == len(self.swarm) - 1:
-                print(f"      Evaluating particle {i + 1}/{len(self.swarm)}")
+            if i % 10 == 0:
+                print(f"    Evaluating particle {i + 1}/{len(self.swarm)}")
             
             # Decode position to architecture
             architecture = self.decoder.decode(particle.position)
@@ -351,9 +367,38 @@ class ParticleSwarmOptimization:
             
             # Update personal best
             particle.update_personal_best()
+    
+    def _evaluate_swarm_parallel(self):
+        """Evaluate fitness for all particles using GPU parallelization."""
+        import time
+        print("    Using parallel evaluation...")
         
-        eval_time = time.time() - eval_start
-        print(f"   ✅ Swarm evaluated in {eval_time:.1f}s")
+        total_start = time.time()
+        
+        # Decode all positions to architectures
+        architectures = []
+        for particle in self.swarm:
+            architecture = self.decoder.decode(particle.position)
+            particle.architecture = architecture
+            architectures.append(architecture)
+        
+        # Use parallel evaluation
+        results_list = self.fitness_evaluator.evaluate_population_parallel(architectures)
+        
+        # Update particle fitness scores and personal bests
+        for i, (particle, result) in enumerate(zip(self.swarm, results_list)):
+            particle.fitness = result['fitness']
+            particle.update_personal_best()
+        
+        total_time = time.time() - total_start
+        print(f"    Parallel evaluation completed in {total_time:.2f} seconds")
+        print(f"    Average time per particle: {total_time/len(self.swarm):.3f} seconds")
+        
+        # Show speedup compared to sequential
+        # Rough estimate: sequential would take ~10-30s per particle
+        estimated_sequential = len(self.swarm) * 15  # Conservative estimate
+        speedup = estimated_sequential / total_time if total_time > 0 else 1
+        print(f"    Estimated speedup over sequential: {speedup:.1f}x")
     
     def _update_global_best(self):
         """Update global best particle."""
@@ -369,30 +414,43 @@ class ParticleSwarmOptimization:
             particle.update_velocity(self.global_best_position, self.w, self.c1, self.c2)
             particle.update_position()
 
-def run_particle_swarm_optimization(dataset_name: str = "cifar10", device: str = None, **kwargs) -> Dict:
+def run_particle_swarm_optimization(dataset_name: str = "cifar10", 
+                                   train_split: float = 1.0, 
+                                   use_parallel: bool = True,
+                                   parallel_batch_size: int = 4,
+                                   **kwargs) -> Dict:
     """Run PSO experiment."""
-    
-    # Set device
-    if device is None:
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"🖥️  Using device: {device}")
     
     # Load dataset
     from training_utils import DatasetLoader
     
     if dataset_name.lower() == "cifar10":
-        train_loader, val_loader, test_loader = DatasetLoader.load_cifar10()
+        train_loader, val_loader, test_loader = DatasetLoader.load_cifar10(train_split=train_split)
         input_shape = (3, 32, 32)
         num_classes = 10
     elif dataset_name.lower() == "mnist":
-        train_loader, val_loader, test_loader = DatasetLoader.load_mnist()
+        train_loader, val_loader, test_loader = DatasetLoader.load_mnist(train_split=train_split)
         input_shape = (1, 28, 28)
         num_classes = 10
     else:
         raise ValueError(f"Unsupported dataset: {dataset_name}")
     
-    # Setup fitness evaluator with device
-    fitness_evaluator = FitnessEvaluator(train_loader, val_loader, device=device)
+    # Setup fitness evaluator with GPU support and parallel evaluation
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    
+    if use_parallel and torch.cuda.is_available():
+        from training_utils import ParallelFitnessEvaluator
+        print(f"Using ParallelFitnessEvaluator with batch size {parallel_batch_size}")
+        fitness_evaluator = ParallelFitnessEvaluator(
+            train_loader, val_loader,
+            device=device,
+            batch_size=parallel_batch_size,
+            max_epochs_parallel=5
+        )
+    else:
+        from training_utils import FitnessEvaluator
+        print("Using sequential FitnessEvaluator")
+        fitness_evaluator = FitnessEvaluator(train_loader, val_loader, device=device)
     
     # Default parameters
     default_params = {
@@ -413,7 +471,7 @@ def run_particle_swarm_optimization(dataset_name: str = "cifar10", device: str =
     print(f"Running PSO on {dataset_name}")
     best_architecture, best_fitness = pso.run()
     
-    # Final evaluation on test set
+    # Final evaluation on test set with GPU support
     from training_utils import NetworkTrainer
     trainer = NetworkTrainer(device=device)
     test_results = trainer.train_and_evaluate(
@@ -444,6 +502,12 @@ if __name__ == "__main__":
     parser.add_argument('--w', type=float, default=0.7)
     parser.add_argument('--c1', type=float, default=2.0)
     parser.add_argument('--c2', type=float, default=2.0)
+    parser.add_argument('--use_parallel', action='store_true', default=True, 
+                        help='Use parallel fitness evaluation')
+    parser.add_argument('--no_parallel', dest='use_parallel', action='store_false',
+                        help='Disable parallel fitness evaluation')
+    parser.add_argument('--parallel_batch_size', type=int, default=4,
+                        help='Batch size for parallel evaluation')
     parser.add_argument('--output', default='pso_results.pkl')
     
     args = parser.parse_args()
@@ -454,7 +518,9 @@ if __name__ == "__main__":
         num_iterations=args.num_iterations,
         w=args.w,
         c1=args.c1,
-        c2=args.c2
+        c2=args.c2,
+        use_parallel=args.use_parallel,
+        parallel_batch_size=args.parallel_batch_size
     )
     
     print(f"\nFinal Results:")
