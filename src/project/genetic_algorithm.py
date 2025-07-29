@@ -1,5 +1,7 @@
 import random
 import numpy as np
+import time
+import torch
 from typing import List, Tuple, Dict
 from architecture_base import NetworkArchitecture, ArchitectureGenerator, LayerConfig, LayerType
 from training_utils import FitnessEvaluator, ExperimentLogger
@@ -42,14 +44,17 @@ class GeneticAlgorithm:
         
     def run(self) -> Tuple[NetworkArchitecture, float]:
         """Run the genetic algorithm."""
-        print(f"Starting Genetic Algorithm with population size {self.population_size}")
+        print(f"🧬 Starting Genetic Algorithm with population size {self.population_size}")
+        print(f"   📋 Generations: {self.num_generations}, Max layers: {self.max_layers}")
+        print(f"   🎯 Crossover: {self.crossover_prob}, Mutation rates: add={self.mutation_add_prob}, del={self.mutation_del_prob}, param={self.mutation_param_prob}")
         
         # Initialize population
         self._initialize_population()
         
         # Evolution loop
         for generation in range(self.num_generations):
-            print(f"Generation {generation + 1}/{self.num_generations}")
+            print(f"\n🔄 Generation {generation + 1}/{self.num_generations}")
+            gen_start_time = time.time()
             
             # Evaluate fitness
             self._evaluate_population()
@@ -58,48 +63,65 @@ class GeneticAlgorithm:
             best_idx = np.argmax(self.fitness_scores)
             best_fitness = self.fitness_scores[best_idx]
             best_architecture = self.population[best_idx]
+            avg_fitness = np.mean(self.fitness_scores)
+            std_fitness = np.std(self.fitness_scores)
             
             self.logger.log_generation(generation, self.fitness_scores, 
                                      best_architecture, best_fitness)
             
-            print(f"  Best fitness: {best_fitness:.4f}")
-            print(f"  Avg fitness: {np.mean(self.fitness_scores):.4f}")
-            print(f"  Best arch layers: {len(best_architecture.layers)}")
-            print(f"  Best arch params: {best_architecture.get_parameter_count()}")
+            gen_time = time.time() - gen_start_time
+            print(f"   📊 Best fitness: {best_fitness:.4f} | Avg: {avg_fitness:.4f} ± {std_fitness:.4f}")
+            print(f"   🏗️  Best architecture: {len(best_architecture.layers)} layers, {best_architecture.get_parameter_count():,} params")
+            print(f"   ⏱️  Generation time: {gen_time:.1f}s")
             
             # Create next generation
             if generation < self.num_generations - 1:
+                print(f"   🔄 Creating next generation...")
                 self._create_next_generation()
         
         # Return best solution
         best_idx = np.argmax(self.fitness_scores)
+        print(f"\n✅ GA completed! Best fitness: {self.fitness_scores[best_idx]:.4f}")
         return self.population[best_idx], self.fitness_scores[best_idx]
     
     def _initialize_population(self):
         """Initialize random population."""
-        print("Initializing population...")
+        print("   🎲 Initializing population...")
+        init_start = time.time()
         self.population = []
+        
         for i in range(self.population_size):
-            if i % 10 == 0:
-                print(f"  Creating individual {i + 1}/{self.population_size}")
+            if i % 10 == 0 or i == self.population_size - 1:
+                print(f"      Creating individual {i + 1}/{self.population_size}")
             architecture = self.generator.generate_random_architecture()
             self.population.append(architecture)
+        
+        init_time = time.time() - init_start
+        print(f"   ✅ Population initialized in {init_time:.1f}s")
     
     def _evaluate_population(self):
         """Evaluate fitness for entire population."""
-        print("Evaluating population fitness...")
+        print("   🎯 Evaluating population fitness...")
+        eval_start = time.time()
         self.fitness_scores = []
         
         for i, architecture in enumerate(self.population):
-            if i % 10 == 0:
-                print(f"  Evaluating {i + 1}/{len(self.population)}")
+            if i % 5 == 0 or i == len(self.population) - 1:
+                print(f"      Evaluating {i + 1}/{len(self.population)}")
             
             results = self.fitness_evaluator.evaluate_fitness(architecture)
             self.fitness_scores.append(results['fitness'])
+        
+        eval_time = time.time() - eval_start
+        print(f"   ✅ Population evaluated in {eval_time:.1f}s")
     
     def _create_next_generation(self):
         """Create next generation through selection, crossover, and mutation."""
+        print("      🔄 Creating offspring...")
+        creation_start = time.time()
         new_population = []
+        crossovers = 0
+        mutations = 0
         
         # Create offspring
         while len(new_population) < self.population_size:
@@ -108,20 +130,26 @@ class GeneticAlgorithm:
                 parent1 = self._tournament_selection()
                 parent2 = self._tournament_selection()
                 child1, child2 = self._crossover(parent1, parent2)
+                crossovers += 1
                 
                 # Mutate offspring
                 child1 = self._mutate(child1)
                 child2 = self._mutate(child2)
+                mutations += 2
                 
                 new_population.extend([child1, child2])
             else:
                 # Just select and mutate
                 parent = self._tournament_selection()
                 child = self._mutate(parent.copy())
+                mutations += 1
                 new_population.append(child)
         
         # Truncate to exact population size
         self.population = new_population[:self.population_size]
+        
+        creation_time = time.time() - creation_start
+        print(f"      ✅ Next generation created in {creation_time:.1f}s ({crossovers} crossovers, {mutations} mutations)")
     
     def _tournament_selection(self) -> NetworkArchitecture:
         """Select individual using tournament selection."""
@@ -338,8 +366,14 @@ class EnhancedGeneticAlgorithm(GeneticAlgorithm):
 
 def run_genetic_algorithm(dataset_name: str = "cifar10", 
                          algorithm_type: str = "EGA",
+                         device: str = None,
                          **kwargs) -> Dict:
     """Run genetic algorithm experiment."""
+    
+    # Set device
+    if device is None:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"🖥️  Using device: {device}")
     
     # Load dataset
     from training_utils import DatasetLoader
@@ -355,8 +389,8 @@ def run_genetic_algorithm(dataset_name: str = "cifar10",
     else:
         raise ValueError(f"Unsupported dataset: {dataset_name}")
     
-    # Setup fitness evaluator
-    fitness_evaluator = FitnessEvaluator(train_loader, val_loader)
+    # Setup fitness evaluator with device
+    fitness_evaluator = FitnessEvaluator(train_loader, val_loader, device=device)
     
     # Default parameters
     default_params = {
@@ -388,7 +422,7 @@ def run_genetic_algorithm(dataset_name: str = "cifar10",
     
     # Final evaluation on test set
     from training_utils import NetworkTrainer
-    trainer = NetworkTrainer()
+    trainer = NetworkTrainer(device=device)
     test_results = trainer.train_and_evaluate(
         best_architecture, train_loader, test_loader, epochs=20
     )

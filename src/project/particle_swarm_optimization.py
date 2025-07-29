@@ -1,5 +1,6 @@
 import numpy as np
 import random
+import time
 from typing import List, Tuple, Dict, Optional
 from architecture_base import NetworkArchitecture, LayerConfig, LayerType, ActivationType
 from training_utils import FitnessEvaluator, ExperimentLogger
@@ -281,22 +282,28 @@ class ParticleSwarmOptimization:
     
     def _initialize_swarm(self):
         """Initialize particle swarm."""
-        print(f"Initializing swarm with {self.swarm_size} particles")
+        print(f"🚀 Initializing swarm with {self.swarm_size} particles")
+        init_start = time.time()
         self.swarm = []
         
         for i in range(self.swarm_size):
-            if i % 10 == 0:
-                print(f"  Creating particle {i + 1}/{self.swarm_size}")
+            if i % 10 == 0 or i == self.swarm_size - 1:
+                print(f"   Creating particle {i + 1}/{self.swarm_size}")
             
             particle = Particle(self.decoder.position_dim, self.decoder.bounds)
             self.swarm.append(particle)
+        
+        init_time = time.time() - init_start
+        print(f"   ✅ Swarm initialized in {init_time:.1f}s")
     
     def run(self) -> Tuple[NetworkArchitecture, float]:
         """Run PSO algorithm."""
-        print(f"Starting PSO with {self.swarm_size} particles for {self.num_iterations} iterations")
+        print(f"🦋 Starting PSO with {self.swarm_size} particles for {self.num_iterations} iterations")
+        print(f"   📋 Parameters: w={self.w}, c1={self.c1}, c2={self.c2}, max_layers={self.max_layers}")
         
         for iteration in range(self.num_iterations):
-            print(f"Iteration {iteration + 1}/{self.num_iterations}")
+            print(f"\n🔄 Iteration {iteration + 1}/{self.num_iterations}")
+            iter_start = time.time()
             
             # Evaluate all particles
             self._evaluate_swarm()
@@ -306,27 +313,33 @@ class ParticleSwarmOptimization:
             
             # Log results
             fitness_scores = [p.fitness for p in self.swarm]
+            avg_fitness = np.mean(fitness_scores)
+            std_fitness = np.std(fitness_scores)
+            
             self.logger.log_generation(iteration, fitness_scores,
                                      self.global_best_architecture, self.global_best_fitness)
             
-            print(f"  Best fitness: {self.global_best_fitness:.4f}")
-            print(f"  Avg fitness: {np.mean(fitness_scores):.4f}")
-            print(f"  Best arch layers: {len(self.global_best_architecture.layers)}")
-            print(f"  Best arch params: {self.global_best_architecture.get_parameter_count()}")
+            iter_time = time.time() - iter_start
+            print(f"   📊 Best fitness: {self.global_best_fitness:.4f} | Avg: {avg_fitness:.4f} ± {std_fitness:.4f}")
+            print(f"   🏗️  Best architecture: {len(self.global_best_architecture.layers)} layers, {self.global_best_architecture.get_parameter_count():,} params")
+            print(f"   ⏱️  Iteration time: {iter_time:.1f}s")
             
             # Update particle dynamics
             if iteration < self.num_iterations - 1:
+                print(f"   🔄 Updating particle dynamics...")
                 self._update_swarm()
         
+        print(f"\n✅ PSO completed! Best fitness: {self.global_best_fitness:.4f}")
         return self.global_best_architecture, self.global_best_fitness
     
     def _evaluate_swarm(self):
         """Evaluate fitness for all particles."""
-        print("  Evaluating swarm fitness...")
+        print("   🎯 Evaluating swarm fitness...")
+        eval_start = time.time()
         
         for i, particle in enumerate(self.swarm):
-            if i % 10 == 0:
-                print(f"    Evaluating particle {i + 1}/{len(self.swarm)}")
+            if i % 5 == 0 or i == len(self.swarm) - 1:
+                print(f"      Evaluating particle {i + 1}/{len(self.swarm)}")
             
             # Decode position to architecture
             architecture = self.decoder.decode(particle.position)
@@ -338,6 +351,9 @@ class ParticleSwarmOptimization:
             
             # Update personal best
             particle.update_personal_best()
+        
+        eval_time = time.time() - eval_start
+        print(f"   ✅ Swarm evaluated in {eval_time:.1f}s")
     
     def _update_global_best(self):
         """Update global best particle."""
@@ -353,8 +369,13 @@ class ParticleSwarmOptimization:
             particle.update_velocity(self.global_best_position, self.w, self.c1, self.c2)
             particle.update_position()
 
-def run_particle_swarm_optimization(dataset_name: str = "cifar10", **kwargs) -> Dict:
+def run_particle_swarm_optimization(dataset_name: str = "cifar10", device: str = None, **kwargs) -> Dict:
     """Run PSO experiment."""
+    
+    # Set device
+    if device is None:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"🖥️  Using device: {device}")
     
     # Load dataset
     from training_utils import DatasetLoader
@@ -370,8 +391,8 @@ def run_particle_swarm_optimization(dataset_name: str = "cifar10", **kwargs) -> 
     else:
         raise ValueError(f"Unsupported dataset: {dataset_name}")
     
-    # Setup fitness evaluator
-    fitness_evaluator = FitnessEvaluator(train_loader, val_loader)
+    # Setup fitness evaluator with device
+    fitness_evaluator = FitnessEvaluator(train_loader, val_loader, device=device)
     
     # Default parameters
     default_params = {
@@ -394,7 +415,7 @@ def run_particle_swarm_optimization(dataset_name: str = "cifar10", **kwargs) -> 
     
     # Final evaluation on test set
     from training_utils import NetworkTrainer
-    trainer = NetworkTrainer()
+    trainer = NetworkTrainer(device=device)
     test_results = trainer.train_and_evaluate(
         best_architecture, train_loader, test_loader, epochs=20
     )

@@ -105,29 +105,42 @@ class ExperimentSuite:
     
     def run_all_experiments(self):
         """Run all algorithms multiple times and collect results."""
-        print(f"Starting experiment suite on {self.dataset_name}")
-        print(f"Number of runs per algorithm: {self.num_runs}")
-        print(f"Output directory: {self.output_dir}")
-        print(f"Available GPU: {torch.cuda.is_available()}")
-        print("-" * 60)
+        print(f"🚀 Starting experiment suite on {self.dataset_name.upper()}")
+        print(f"   📊 Number of runs per algorithm: {self.num_runs}")
+        print(f"   📁 Output directory: {self.output_dir}")
+        print(f"   🖥️  GPU available: {torch.cuda.is_available()}")
+        print(f"   🧮 PyTorch version: {torch.__version__}")
+        print("="*80)
+        
+        total_experiments = len(self.algorithms) * self.num_runs
+        completed_experiments = 0
+        experiment_start_time = time.time()
         
         for algorithm_name, config in self.algorithms.items():
-            print(f"\n{'='*20} Running {algorithm_name} {'='*20}")
+            print(f"\n{'🧬' if 'GA' in algorithm_name else '🦋' if 'PSO' in algorithm_name else '🌡️'} {algorithm_name} {'='*60}")
+            print(f"   📋 Parameters: {config['params']}")
             
             algorithm_results = []
+            algorithm_start_time = time.time()
             
             for run_id in range(self.num_runs):
-                print(f"\n--- Run {run_id + 1}/{self.num_runs} ---")
+                print(f"\n--- 🔄 Run {run_id + 1}/{self.num_runs} ---")
+                run_start_time = time.time()
                 
                 try:
                     # Set random seeds for reproducibility
                     torch.manual_seed(42 + run_id)
                     np.random.seed(42 + run_id)
+                    print(f"   🎲 Random seed set to: {42 + run_id}")
+                    
+                    # Detect and set device
+                    device = "cuda" if torch.cuda.is_available() else "cpu"
                     
                     # Run algorithm
                     start_time = time.time()
                     result = config['function'](
                         dataset_name=self.dataset_name,
+                        device=device,
                         **config['params']
                     )
                     end_time = time.time()
@@ -137,6 +150,7 @@ class ExperimentSuite:
                     result['run_id'] = run_id
                     
                     algorithm_results.append(result)
+                    completed_experiments += 1
                     
                     # Save individual result
                     filename = f"{algorithm_name}_{self.dataset_name}_run_{run_id}.pkl"
@@ -144,15 +158,21 @@ class ExperimentSuite:
                     with open(filepath, 'wb') as f:
                         pickle.dump(result, f)
                     
-                    print(f"Run {run_id + 1} completed in {end_time - start_time:.1f}s")
-                    print(f"Best fitness: {result['best_fitness']:.4f}")
-                    print(f"Test accuracy: {result['test_accuracy']:.2f}%")
-                    print(f"Parameters: {result['parameter_count']:,}")
+                    run_time = time.time() - run_start_time
+                    total_elapsed = time.time() - experiment_start_time
+                    eta = (total_elapsed / completed_experiments) * (total_experiments - completed_experiments)
+                    
+                    print(f"   ✅ Run {run_id + 1} completed in {run_time:.1f}s")
+                    print(f"      🏆 Best fitness: {result['best_fitness']:.4f}")
+                    print(f"      🎯 Test accuracy: {result['test_accuracy']:.2f}%")
+                    print(f"      📊 Parameters: {result['parameter_count']:,}")
+                    print(f"      📈 Progress: {completed_experiments}/{total_experiments} | ETA: {eta/60:.1f}min")
                     
                 except Exception as e:
-                    print(f"Run {run_id + 1} failed: {e}")
+                    print(f"   ❌ Run {run_id + 1} failed: {e}")
                     continue
             
+            algorithm_time = time.time() - algorithm_start_time
             self.results[algorithm_name] = algorithm_results
             
             # Save aggregated results for this algorithm
@@ -161,18 +181,23 @@ class ExperimentSuite:
             with open(agg_filepath, 'wb') as f:
                 pickle.dump(algorithm_results, f)
             
-            print(f"\n{algorithm_name} completed: {len(algorithm_results)}/{self.num_runs} successful runs")
+            success_rate = len(algorithm_results) / self.num_runs
+            print(f"\n✅ {algorithm_name} completed in {algorithm_time/60:.1f}min: {len(algorithm_results)}/{self.num_runs} successful runs (success rate: {success_rate:.1%})")
+        
+        total_time = time.time() - experiment_start_time
+        print(f"\n🏁 All experiments completed in {total_time/3600:.1f} hours!")
     
     def generate_summary(self):
         """Generate summary statistics for all algorithms."""
-        print("\n" + "="*60)
-        print("EXPERIMENT SUMMARY")
-        print("="*60)
+        print("\n" + "🏆"*80)
+        print("                           EXPERIMENT SUMMARY")
+        print("🏆"*80)
         
         summary_data = {}
         
         for algorithm_name, results in self.results.items():
             if not results:
+                print(f"❌ {algorithm_name}: No successful runs")
                 continue
             
             # Extract metrics
@@ -212,18 +237,40 @@ class ExperimentSuite:
             
             summary_data[algorithm_name] = stats
             
-            # Print summary
-            print(f"\n{algorithm_name} Results ({len(results)} runs):")
-            print(f"  Test Accuracy: {stats['test_accuracy']['mean']:.2f}% ± {stats['test_accuracy']['std']:.2f}%")
-            print(f"  Best Fitness:  {stats['best_fitness']['mean']:.4f} ± {stats['best_fitness']['std']:.4f}")
-            print(f"  Parameters:    {stats['parameter_count']['mean']:.0f} ± {stats['parameter_count']['std']:.0f}")
-            print(f"  Runtime:       {stats['runtime']['mean']:.1f}s ± {stats['runtime']['std']:.1f}s")
+            # Print formatted results
+            emoji = "🧬" if "GA" in algorithm_name else "🦋" if "PSO" in algorithm_name else "🌡️"
+            print(f"\n{emoji} {algorithm_name} Results ({len(results)} runs):")
+            print(f"   🎯 Test Accuracy: {stats['test_accuracy']['mean']:.2f}% ± {stats['test_accuracy']['std']:.2f}% (range: {stats['test_accuracy']['min']:.2f}%-{stats['test_accuracy']['max']:.2f}%)")
+            print(f"   🏆 Best Fitness:  {stats['best_fitness']['mean']:.4f} ± {stats['best_fitness']['std']:.4f} (range: {stats['best_fitness']['min']:.4f}-{stats['best_fitness']['max']:.4f})")
+            print(f"   📊 Parameters:    {stats['parameter_count']['mean']:,.0f} ± {stats['parameter_count']['std']:,.0f} (range: {stats['parameter_count']['min']:,.0f}-{stats['parameter_count']['max']:,.0f})")
+            print(f"   ⏱️  Runtime:       {stats['runtime']['mean']/60:.1f}min ± {stats['runtime']['std']/60:.1f}min (range: {stats['runtime']['min']/60:.1f}-{stats['runtime']['max']/60:.1f}min)")
         
-        # Save summary
+        # Find best performing algorithm
+        if summary_data:
+            best_algo = max(summary_data.keys(), 
+                           key=lambda x: summary_data[x]['test_accuracy']['mean'])
+            best_acc = summary_data[best_algo]['test_accuracy']['mean']
+            
+            print(f"\n🥇 Best Performing Algorithm: {best_algo} with {best_acc:.2f}% average test accuracy")
+            
+            # Efficiency analysis (accuracy per parameter)
+            print(f"\n📈 Efficiency Analysis (Accuracy/Million Parameters):")
+            for algo_name, stats in summary_data.items():
+                efficiency = stats['test_accuracy']['mean'] / (stats['parameter_count']['mean'] / 1_000_000)
+                emoji = "🧬" if "GA" in algo_name else "🦋" if "PSO" in algo_name else "🌡️"
+                print(f"   {emoji} {algo_name}: {efficiency:.2f}")
+        
+        return summary_data
+    
+    def save_summary(self, summary_data: Dict):
+        """Save summary to file."""
         summary_filename = f"experiment_summary_{self.dataset_name}.pkl"
         summary_filepath = os.path.join(self.output_dir, summary_filename)
+        
         with open(summary_filepath, 'wb') as f:
             pickle.dump(summary_data, f)
+        
+        print(f"\n💾 Summary saved to: {summary_filepath}")
         
         # Create ranking
         if len(summary_data) > 1:
@@ -252,9 +299,14 @@ class ExperimentSuite:
         
         return summary_data
 
-def run_baseline_comparison():
+def run_baseline_comparison(device: str = None):
     """Run baseline random search for comparison."""
     print("\n" + "="*20 + " Running Baseline " + "="*20)
+    
+    # Set device
+    if device is None:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"🖥️  Using device: {device}")
     
     from architecture_base import ArchitectureGenerator
     from training_utils import FitnessEvaluator, DatasetLoader, NetworkTrainer
@@ -264,10 +316,10 @@ def run_baseline_comparison():
     input_shape = (3, 32, 32)
     num_classes = 10
     
-    # Setup
-    fitness_evaluator = FitnessEvaluator(train_loader, val_loader)
+    # Setup with device
+    fitness_evaluator = FitnessEvaluator(train_loader, val_loader, device=device)
     generator = ArchitectureGenerator(input_shape, num_classes, max_layers=8)
-    trainer = NetworkTrainer()
+    trainer = NetworkTrainer(device=device)
     
     # Random search
     num_random_samples = 50
@@ -371,7 +423,8 @@ def main():
         
         # Run baseline if requested
         if args.include_baseline:
-            baseline_result = run_baseline_comparison()
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            baseline_result = run_baseline_comparison(device=device)
             
             # Save baseline result
             baseline_filename = f"baseline_{args.dataset}.pkl"

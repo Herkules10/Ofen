@@ -15,6 +15,8 @@ class DatasetLoader:
     @staticmethod
     def load_cifar10(batch_size: int = 64, validation_split: float = 0.2) -> Tuple[DataLoader, DataLoader, DataLoader]:
         """Load CIFAR-10 dataset with train/val/test splits."""
+        print(f"📊 Loading CIFAR-10 dataset (batch_size={batch_size}, val_split={validation_split})")
+        
         transform_train = transforms.Compose([
             transforms.RandomHorizontalFlip(p=0.5),
             transforms.RandomRotation(10),
@@ -28,6 +30,7 @@ class DatasetLoader:
         ])
         
         # Load datasets
+        print("   📥 Downloading/loading CIFAR-10 data...")
         train_full = torchvision.datasets.CIFAR10(
             root='./data', train=True, download=True, transform=transform_train
         )
@@ -40,21 +43,27 @@ class DatasetLoader:
         val_size = len(train_full) - train_size
         train_dataset, val_dataset = random_split(train_full, [train_size, val_size])
         
+        print(f"   📊 Dataset sizes: train={train_size}, val={val_size}, test={len(test_dataset)}")
+        
         # Create data loaders
         train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=2)
         val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=2)
         test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=2)
         
+        print(f"   ✅ CIFAR-10 loaded successfully!")
         return train_loader, val_loader, test_loader
     
     @staticmethod
     def load_mnist(batch_size: int = 64, validation_split: float = 0.2) -> Tuple[DataLoader, DataLoader, DataLoader]:
         """Load MNIST dataset with train/val/test splits."""
+        print(f"📊 Loading MNIST dataset (batch_size={batch_size}, val_split={validation_split})")
+        
         transform = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize((0.1307,), (0.3081,))
         ])
         
+        print("   📥 Downloading/loading MNIST data...")
         train_full = torchvision.datasets.MNIST(
             root='./data', train=True, download=True, transform=transform
         )
@@ -67,10 +76,13 @@ class DatasetLoader:
         val_size = len(train_full) - train_size
         train_dataset, val_dataset = random_split(train_full, [train_size, val_size])
         
+        print(f"   📊 Dataset sizes: train={train_size}, val={val_size}, test={len(test_dataset)}")
+        
         train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=2)
         val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=2)
         test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=2)
         
+        print(f"   ✅ MNIST loaded successfully!")
         return train_loader, val_loader, test_loader
 
 class NetworkTrainer:
@@ -81,6 +93,13 @@ class NetworkTrainer:
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         else:
             self.device = torch.device(device)
+        
+        # Print device information
+        if self.device.type == "cuda":
+            print(f"🎮 CUDA device: {torch.cuda.get_device_name()}")
+            print(f"   Memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f}GB")
+        else:
+            print(f"💻 Using CPU device")
     
     def train_and_evaluate(self, 
                           architecture: NetworkArchitecture,
@@ -92,12 +111,16 @@ class NetworkTrainer:
         """Train and evaluate a neural network architecture."""
         
         try:
+            print(f"    🔧 Building network with {len(architecture.layers)} layers...")
             # Build network
             network = architecture.build_network().to(self.device)
             
             # Check for reasonable parameter count
             param_count = sum(p.numel() for p in network.parameters())
+            print(f"    📊 Network parameters: {param_count:,}")
+            
             if param_count > 5_000_000:  # Too many parameters
+                print(f"    ❌ Network too large ({param_count:,} parameters), skipping training")
                 return {
                     'accuracy': 0.0,
                     'loss': float('inf'),
@@ -111,11 +134,15 @@ class NetworkTrainer:
             optimizer = optim.Adam(network.parameters(), lr=learning_rate, weight_decay=1e-4)
             scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=2, factor=0.5)
             
+            print(f"    🎯 Starting training for {epochs} epochs (LR: {learning_rate})")
             best_val_accuracy = 0.0
             patience_counter = 0
             start_time = time.time()
             
             for epoch in range(epochs):
+                epoch_start = time.time()
+                print(f"      📈 Epoch {epoch + 1}/{epochs}", end=" | ")
+                
                 # Training phase
                 network.train()
                 train_loss = 0.0
@@ -144,20 +171,33 @@ class NetworkTrainer:
                     if batch_idx >= 50:  # Process only first 50 batches
                         break
                 
+                # Calculate training metrics for this epoch
+                train_accuracy = 100.0 * train_correct / train_total if train_total > 0 else 0.0
+                avg_train_loss = train_loss / min(batch_idx + 1, 50)
+                
                 # Validation phase
                 val_accuracy, val_loss = self._evaluate(network, val_loader, criterion)
                 scheduler.step(val_loss)
+                
+                # Print epoch results
+                epoch_time = time.time() - epoch_start
+                print(f"Train: {train_accuracy:.1f}% | Val: {val_accuracy:.1f}% | Loss: {val_loss:.3f} | Time: {epoch_time:.1f}s")
                 
                 # Early stopping check
                 if val_accuracy > best_val_accuracy:
                     best_val_accuracy = val_accuracy
                     patience_counter = 0
+                    print(f"        ✅ New best validation accuracy: {best_val_accuracy:.2f}%")
                 else:
                     patience_counter += 1
+                    print(f"        ⏳ No improvement ({patience_counter}/{early_stopping_patience})")
                     if patience_counter >= early_stopping_patience:
+                        print(f"        🛑 Early stopping triggered after {epoch + 1} epochs")
                         break
             
             training_time = time.time() - start_time
+            
+            print(f"    ✅ Training completed in {training_time:.1f}s | Final accuracy: {best_val_accuracy:.2f}%")
             
             return {
                 'accuracy': best_val_accuracy,
@@ -168,7 +208,13 @@ class NetworkTrainer:
             }
             
         except Exception as e:
-            print(f"Training failed: {e}")
+            print(f"    ❌ Training failed: {e}")
+            
+            # Clear GPU memory if using CUDA
+            if self.device.type == "cuda":
+                torch.cuda.empty_cache()
+                print(f"    🧹 GPU memory cleared")
+                
             return {
                 'accuracy': 0.0,
                 'loss': float('inf'),
@@ -228,7 +274,10 @@ class FitnessEvaluator:
         
         # Check cache first
         if arch_hash in self.evaluation_cache:
+            print(f"  🔄 Using cached result for architecture")
             return self.evaluation_cache[arch_hash].copy()
+        
+        print(f"  🧬 Evaluating new architecture ({len(architecture.layers)} layers)")
         
         # Train and evaluate
         results = self.trainer.train_and_evaluate(
@@ -244,6 +293,8 @@ class FitnessEvaluator:
         
         results['fitness'] = fitness
         results['efficiency'] = accuracy / (param_count / 1000) if param_count > 0 else 0
+        
+        print(f"  📊 Results: Acc={accuracy:.2f}%, Params={param_count:,}, Fitness={fitness:.2f}")
         
         # Cache result
         self.evaluation_cache[arch_hash] = results.copy()
@@ -278,13 +329,23 @@ class ExperimentLogger:
         }
         self.results.append(gen_stats)
         
-        # Store best architecture
-        if not self.best_architectures or best_fitness > max(r['best_fitness'] for r in self.results[:-1]):
+        # Store best architecture if it's an improvement
+        if not self.best_architectures or best_fitness > max(arch['fitness'] for arch in self.best_architectures):
+            print(f"      🌟 New global best found in {self.experiment_name}!")
             self.best_architectures.append({
                 'generation': generation,
                 'architecture': best_architecture.copy(),
                 'fitness': best_fitness
             })
+        
+        # Log convergence status every 10 generations
+        if generation > 0 and generation % 10 == 0:
+            recent_fitness = [r['best_fitness'] for r in self.results[-10:]]
+            improvement = recent_fitness[-1] - recent_fitness[0]
+            print(f"      📈 Convergence check: fitness improved by {improvement:.4f} over last 10 generations")
+            
+            if abs(improvement) < 0.001:
+                print(f"      ⚠️  Low improvement detected - may be converging")
     
     def get_convergence_data(self) -> Dict:
         """Get convergence data for plotting."""
