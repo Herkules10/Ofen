@@ -152,14 +152,19 @@ class NeighborhoodOperator:
         return new_arch if len(new_arch.layers) > 0 else architecture
 
 class SimulatedAnnealing:
-    """Simulated Annealing for Neural Architecture Search."""
+    """
+    Simulated Annealing for Neural Architecture Search.
+    
+    Now optimized to use ParallelFitnessEvaluator with batch size 1 for better GPU efficiency,
+    even though SA evaluates architectures sequentially.
+    """
     
     def __init__(self,
                  fitness_evaluator: FitnessEvaluator,
                  input_shape: Tuple[int, ...],
                  num_classes: int,
                  initial_temperature: float = 100.0,
-                 cooling_rate: float = 0.8,
+                 cooling_rate: float = 0.981748,
                  min_temperature: float = 0.01,
                  max_iterations: int = 1000,
                  max_layers: int = 10):
@@ -196,6 +201,10 @@ class SimulatedAnnealing:
         print(f"Cooling rate: {self.cooling_rate}")
         print(f"Max iterations: {self.max_iterations}")
         
+        # Check if using parallel evaluator
+        if hasattr(self.fitness_evaluator, 'evaluate_population_parallel'):
+            print("Using ParallelFitnessEvaluator with batch size 1 for efficient GPU usage")
+        
         # Initialize with random architecture
         self._initialize()
         
@@ -220,8 +229,8 @@ class SimulatedAnnealing:
             # Generate neighbor
             neighbor_architecture = self.neighborhood.get_neighbor(self.current_architecture)
             
-            # Evaluate neighbor
-            neighbor_results = self.fitness_evaluator.evaluate_fitness(neighbor_architecture)
+            # Evaluate neighbor using parallel evaluator
+            neighbor_results = self._evaluate_architecture(neighbor_architecture)
             neighbor_fitness = neighbor_results['fitness']
             
             # Decide whether to accept the neighbor
@@ -262,6 +271,34 @@ class SimulatedAnnealing:
         print(f"Rejected moves: {self.rejected_moves}")
         print(f"Acceptance rate: {self.accepted_moves/(self.accepted_moves + self.rejected_moves):.3f}")
         
+        # Show evaluation count if available
+        if hasattr(self.fitness_evaluator, 'logger') and self.fitness_evaluator.logger:
+            eval_count = len(self.fitness_evaluator.logger.evaluation_log)
+            print(f"Total fitness evaluations logged: {eval_count}")
+            if eval_count != iteration + 1:  # +1 for initial evaluation
+                print(f"  Note: Discrepancy between iterations ({iteration+1}) and evaluations ({eval_count}) may indicate failed network builds")
+                
+                # Show breakdown of skipped evaluations if available
+                failed_builds = getattr(self.fitness_evaluator, 'failed_builds', 0)
+                skipped_large = getattr(self.fitness_evaluator, 'skipped_large_networks', 0)
+                
+                print(f"  Debug: failed_builds={failed_builds}, skipped_large={skipped_large}")
+                
+                if failed_builds > 0:
+                    print(f"  Failed network builds: {failed_builds}")
+                        
+                if skipped_large > 0:
+                    print(f"  Networks skipped (too large): {skipped_large}")
+                        
+                total_skipped = failed_builds + skipped_large
+                    
+                if total_skipped > 0:
+                    expected_evals = iteration + 1
+                    actual_evals = eval_count
+                    missing_evals = expected_evals - actual_evals
+                    print(f"  Expected evaluations: {expected_evals}, Actual: {actual_evals}, Missing: {missing_evals}")
+                    print(f"  Known skipped: {total_skipped}, Unexplained missing: {missing_evals - total_skipped}")
+        
         return self.best_architecture, self.best_fitness
     
     def _initialize(self):
@@ -269,8 +306,8 @@ class SimulatedAnnealing:
         print("Initializing with random architecture...")
         self.current_architecture = self.generator.generate_random_architecture()
         
-        # Evaluate initial architecture
-        results = self.fitness_evaluator.evaluate_fitness(self.current_architecture)
+        # Evaluate initial architecture using parallel evaluator
+        results = self._evaluate_architecture(self.current_architecture)
         self.current_fitness = results['fitness']
         
         # Set as best initially
@@ -286,6 +323,16 @@ class SimulatedAnnealing:
         print(f"Initial layers: {len(self.current_architecture.layers)}")
         print(f"Initial parameters: {self.current_architecture.get_parameter_count():,}")
     
+    def _evaluate_architecture(self, architecture: NetworkArchitecture) -> Dict[str, float]:
+        """Evaluate a single architecture using parallel evaluator with batch size 1."""
+        if hasattr(self.fitness_evaluator, 'evaluate_population_parallel'):
+            # Use ParallelFitnessEvaluator with batch size 1 for better GPU efficiency
+            results_list = self.fitness_evaluator.evaluate_population_parallel([architecture])
+            return results_list[0]
+        else:
+            # Fallback to standard evaluation
+            return self.fitness_evaluator.evaluate_fitness(architecture)
+
     def _accept_neighbor(self, neighbor_fitness: float) -> bool:
         """Decide whether to accept a neighbor solution."""
         if neighbor_fitness > self.current_fitness:
@@ -351,7 +398,7 @@ class AdaptiveSimulatedAnnealing(SimulatedAnnealing):
             
             # Generate and evaluate neighbor
             neighbor_architecture = self.neighborhood.get_neighbor(self.current_architecture)
-            neighbor_results = self.fitness_evaluator.evaluate_fitness(neighbor_architecture)
+            neighbor_results = self._evaluate_architecture(neighbor_architecture)
             neighbor_fitness = neighbor_results['fitness']
             
             # Accept/reject decision
@@ -414,6 +461,7 @@ class AdaptiveSimulatedAnnealing(SimulatedAnnealing):
         # Calculate recent acceptance rate
         recent_acceptance = np.mean(self.acceptance_history[-self.acceptance_window:])
         
+        '''""
         # Adjust cooling rate based on acceptance
         if recent_acceptance > 0.8:  # Too many acceptances, cool faster
             cooling_factor = self.cooling_rate * 0.95
@@ -421,7 +469,7 @@ class AdaptiveSimulatedAnnealing(SimulatedAnnealing):
             cooling_factor = self.cooling_rate * 1.05
         else:
             cooling_factor = self.cooling_rate
-        
+        '''
         # Clamp cooling factor
         cooling_factor = max(0.85, min(0.99, cooling_factor))
         
@@ -448,24 +496,20 @@ def run_simulated_annealing(dataset_name: str = "cifar10",
     else:
         raise ValueError(f"Unsupported dataset: {dataset_name}")
     
-    # Setup fitness evaluator with GPU support
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    fitness_evaluator = FitnessEvaluator(train_loader, val_loader, device=device)
-    
     # Default parameters
     default_params = {
         'initial_temperature': 100.0,
-        'cooling_rate': 0.95,
+        'cooling_rate': 0.981748,
         'min_temperature': 0.01,
         'max_iterations': 1000,
         'max_layers': 10
     }
     default_params.update(kwargs)
     
-    # Run algorithm
+    # Create algorithm first to get logger
     if algorithm_type.upper() == "ASA":
         algorithm = AdaptiveSimulatedAnnealing(
-            fitness_evaluator, input_shape, num_classes,
+            None, input_shape, num_classes,  # Pass None first, will set later
             adaptive_cooling=True,
             reheat_threshold=100,
             reheat_factor=2.0,
@@ -473,9 +517,26 @@ def run_simulated_annealing(dataset_name: str = "cifar10",
         )
     else:
         algorithm = SimulatedAnnealing(
-            fitness_evaluator, input_shape, num_classes,
+            None, input_shape, num_classes,  # Pass None first, will set later
             **default_params
         )
+    
+    # Setup fitness evaluator with logger
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    
+    # Use ParallelFitnessEvaluator for better GPU efficiency, even with batch size 1
+    from training_utils import ParallelFitnessEvaluator
+    print(f"Using ParallelFitnessEvaluator with batch size 1 for efficient GPU usage")
+    fitness_evaluator = ParallelFitnessEvaluator(
+        train_loader, val_loader, 
+        device=device,
+        batch_size=1,  # SA evaluates one architecture at a time
+        max_epochs_parallel=5,  # Same as GA/PSO for consistency
+        logger=algorithm.logger  # Pass the logger
+    )
+    
+    # Set the fitness evaluator in the algorithm
+    algorithm.fitness_evaluator = fitness_evaluator
     
     print(f"Running {algorithm_type} on {dataset_name}")
     best_architecture, best_fitness = algorithm.run()
@@ -484,7 +545,7 @@ def run_simulated_annealing(dataset_name: str = "cifar10",
     from training_utils import NetworkTrainer
     trainer = NetworkTrainer(device=device)
     test_results = trainer.train_and_evaluate(
-        best_architecture, train_loader, test_loader, epochs=20
+        best_architecture, train_loader, test_loader, epochs=5
     )
     
     return {
@@ -510,7 +571,7 @@ if __name__ == "__main__":
     parser.add_argument('--dataset', default='cifar10', choices=['cifar10', 'mnist'])
     parser.add_argument('--algorithm', default='ASA', choices=['SA', 'ASA'])
     parser.add_argument('--initial_temperature', type=float, default=100.0)
-    parser.add_argument('--cooling_rate', type=float, default=0.95)
+    parser.add_argument('--cooling_rate', type=float, default=0.981748)
     parser.add_argument('--max_iterations', type=int, default=500)
     parser.add_argument('--output', default='sa_results.pkl')
     

@@ -435,23 +435,6 @@ def run_particle_swarm_optimization(dataset_name: str = "cifar10",
     else:
         raise ValueError(f"Unsupported dataset: {dataset_name}")
     
-    # Setup fitness evaluator with GPU support and parallel evaluation
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    
-    if use_parallel and torch.cuda.is_available():
-        from training_utils import ParallelFitnessEvaluator
-        print(f"Using ParallelFitnessEvaluator with batch size {parallel_batch_size}")
-        fitness_evaluator = ParallelFitnessEvaluator(
-            train_loader, val_loader,
-            device=device,
-            batch_size=parallel_batch_size,
-            max_epochs_parallel=5
-        )
-    else:
-        from training_utils import FitnessEvaluator
-        print("Using sequential FitnessEvaluator")
-        fitness_evaluator = FitnessEvaluator(train_loader, val_loader, device=device)
-    
     # Default parameters
     default_params = {
         'swarm_size': 30,
@@ -463,10 +446,35 @@ def run_particle_swarm_optimization(dataset_name: str = "cifar10",
     }
     default_params.update(kwargs)
     
-    # Run PSO
+    # Create PSO first to get logger
     pso = ParticleSwarmOptimization(
-        fitness_evaluator, input_shape, num_classes, **default_params
+        None, input_shape, num_classes, **default_params
     )
+    
+    # Setup fitness evaluator with logger
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    
+    if use_parallel and torch.cuda.is_available():
+        from training_utils import ParallelFitnessEvaluator
+        print(f"Using ParallelFitnessEvaluator with batch size {parallel_batch_size}")
+        fitness_evaluator = ParallelFitnessEvaluator(
+            train_loader, val_loader,
+            device=device,
+            batch_size=parallel_batch_size,
+            max_epochs_parallel=5,
+            logger=pso.logger  # Pass the logger
+        )
+    else:
+        from training_utils import FitnessEvaluator
+        print("Using sequential FitnessEvaluator")
+        fitness_evaluator = FitnessEvaluator(
+            train_loader, val_loader, 
+            device=device,
+            logger=pso.logger  # Pass the logger
+        )
+    
+    # Set the fitness evaluator in PSO
+    pso.fitness_evaluator = fitness_evaluator
     
     print(f"Running PSO on {dataset_name}")
     best_architecture, best_fitness = pso.run()
@@ -475,7 +483,7 @@ def run_particle_swarm_optimization(dataset_name: str = "cifar10",
     from training_utils import NetworkTrainer
     trainer = NetworkTrainer(device=device)
     test_results = trainer.train_and_evaluate(
-        best_architecture, train_loader, test_loader, epochs=20
+        best_architecture, train_loader, test_loader, epochs=5
     )
     
     return {

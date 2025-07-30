@@ -28,6 +28,25 @@ class ResultsVisualizer:
         # Load all results
         self.results = self._load_all_results()
         self.summary_data = self._load_summary_data()
+    
+    def _get_algorithm_colors(self, algorithms: List[str]) -> List[str]:
+        """Get consistent colors for algorithms."""
+        color_map = {
+            'GA': '#FF6B6B',    # Red
+            'EGA': '#FF6B6B',   # Red (same as GA) 
+            'PSO': '#4ECDC4',   # Teal/Green
+            'SA': "#2F00FF",    # Blue
+            'ASA': "#7700FF"    # Light Green
+        }
+        
+        distinct_colors = ['#FF6B6B', '#4ECDC4', "#1100FF"]
+        colors = []
+        for alg in algorithms:
+            if alg in color_map:
+                colors.append(color_map[alg])
+            else:
+                colors.append(distinct_colors[len(colors) % len(distinct_colors)])
+        return colors
         
     def _load_all_results(self) -> Dict:
         """Load all experiment results from pickle files."""
@@ -64,6 +83,9 @@ class ResultsVisualizer:
         
         # Individual algorithm analysis
         self.plot_individual_convergence()
+        
+        # New: Fitness evaluation progress plot
+        self.plot_fitness_evaluation_progress()
         
         print(f"All plots saved to: {self.output_dir}")
     
@@ -119,10 +141,12 @@ class ResultsVisualizer:
         accuracies = [self.summary_data[alg]['test_accuracy']['mean'] for alg in algorithms]
         param_counts = [self.summary_data[alg]['parameter_count']['mean'] / 1000 for alg in algorithms]  # in thousands
         
+        # Use consistent colors
+        colors = self._get_algorithm_colors(algorithms)
+        
         # Scatter plot
-        colors = plt.cm.Set1(np.linspace(0, 1, len(algorithms)))
         for i, (alg, acc, params) in enumerate(zip(algorithms, accuracies, param_counts)):
-            ax.scatter(params, acc, s=150, c=[colors[i]], label=alg, alpha=0.8)
+            ax.scatter(params, acc, s=150, c=colors[i], label=alg, alpha=0.8)
             ax.annotate(alg, (params, acc), xytext=(5, 5), textcoords='offset points')
         
         ax.set_xlabel('Parameter Count (thousands)')
@@ -136,48 +160,76 @@ class ResultsVisualizer:
         plt.close()
     
     def plot_convergence_curves(self):
-        """Plot convergence curves for all algorithms."""
+        """Plot convergence curves for all algorithms using number of evaluations and cumulative best fitness."""
         if not self.results:
             return
         
         fig, ax = plt.subplots(figsize=(12, 8))
         
-        colors = plt.cm.tab10(np.linspace(0, 1, len(self.results)))
+        # Use consistent colors
+        algorithm_names = list(self.results.keys())
+        colors = self._get_algorithm_colors(algorithm_names)
         
         for i, (algorithm, runs) in enumerate(self.results.items()):
             if not runs:
                 continue
             
-            # Collect convergence data from all runs
-            all_convergence = []
+            # Collect evaluation-based convergence data from all runs
+            all_run_data = []
             for run in runs:
-                if 'convergence_data' in run:
-                    conv_data = run['convergence_data']
-                    if 'best_fitness' in conv_data:
-                        all_convergence.append(conv_data['best_fitness'])
+                if 'convergence_data' in run and 'evaluation_log' in run['convergence_data']:
+                    eval_log = run['convergence_data']['evaluation_log']
+                    if eval_log:
+                        # Extract evaluation numbers and fitness values
+                        evaluations = [eval_data['evaluation_number'] for eval_data in eval_log]
+                        fitness_values = [eval_data['fitness'] for eval_data in eval_log]
+                        
+                        # Sort by evaluation number to ensure proper order
+                        sorted_pairs = sorted(zip(evaluations, fitness_values))
+                        sorted_evals, sorted_fitness = zip(*sorted_pairs)
+                        
+                        # Calculate cumulative best fitness (best so far)
+                        cumulative_best = []
+                        best_so_far = -float('inf')  # Start with very low value
+                        for fitness in sorted_fitness:
+                            if fitness > best_so_far:
+                                best_so_far = fitness
+                            cumulative_best.append(best_so_far)
+                        
+                        all_run_data.append((sorted_evals, cumulative_best))
             
-            if not all_convergence:
+            if not all_run_data:
                 continue
             
-            # Find minimum length to align all runs
-            min_length = min(len(conv) for conv in all_convergence)
-            aligned_convergence = [conv[:min_length] for conv in all_convergence]
+            # Find the maximum number of evaluations across all runs for this algorithm
+            max_evaluations = max(max(evals) for evals, _ in all_run_data)
             
-            # Calculate mean and std
-            mean_convergence = np.mean(aligned_convergence, axis=0)
-            std_convergence = np.std(aligned_convergence, axis=0)
-            generations = range(len(mean_convergence))
+            # Create a common evaluation grid
+            eval_grid = np.arange(1, max_evaluations + 1)
             
-            # Plot mean with confidence interval
-            ax.plot(generations, mean_convergence, label=algorithm, color=colors[i], linewidth=2)
-            ax.fill_between(generations, 
-                           mean_convergence - std_convergence,
-                           mean_convergence + std_convergence,
-                           alpha=0.2, color=colors[i])
+            # Interpolate each run's data to the common grid
+            interpolated_runs = []
+            for evaluations, cumulative_best in all_run_data:
+                # Interpolate cumulative best fitness to the common evaluation grid
+                interpolated_best = np.interp(eval_grid, evaluations, cumulative_best)
+                interpolated_runs.append(interpolated_best)
+            
+            if interpolated_runs:
+                # Calculate mean and std across runs
+                interpolated_array = np.array(interpolated_runs)
+                mean_convergence = np.mean(interpolated_array, axis=0)
+                std_convergence = np.std(interpolated_array, axis=0)
+                
+                # Plot mean with confidence interval
+                ax.plot(eval_grid, mean_convergence, label=algorithm, color=colors[i], linewidth=2)
+                ax.fill_between(eval_grid, 
+                               mean_convergence - std_convergence,
+                               mean_convergence + std_convergence,
+                               alpha=0.2, color=colors[i])
         
-        ax.set_xlabel('Generation/Iteration')
-        ax.set_ylabel('Best Fitness')
-        ax.set_title('Convergence Curves Comparison')
+        ax.set_xlabel('Number of Evaluations')
+        ax.set_ylabel('Best Fitness Achieved So Far')
+        ax.set_title('Convergence Curves Comparison - Cumulative Best Fitness')
         ax.legend()
         ax.grid(True, alpha=0.3)
         
@@ -321,6 +373,83 @@ class ResultsVisualizer:
                        dpi=300, bbox_inches='tight')
             plt.close()
     
+    def plot_fitness_evaluation_progress(self):
+        """Plot fitness vs evaluation number scatter plot."""
+        if not self.results:
+            print("No results available for fitness evaluation progress plot")
+            return
+        
+        fig, ax = plt.subplots(figsize=(12, 8))
+        
+        # Use consistent colors
+        algorithm_names = list(self.results.keys())
+        colors = self._get_algorithm_colors(algorithm_names)
+        
+        for i, (algorithm, runs) in enumerate(self.results.items()):
+            if not runs:
+                continue
+            
+            # Collect all evaluation data from all runs
+            all_evaluations = []
+            all_fitness = []
+            
+            for run in runs:
+                if 'convergence_data' in run and 'evaluation_log' in run['convergence_data']:
+                    eval_log = run['convergence_data']['evaluation_log']
+                    for eval_data in eval_log:
+                        all_evaluations.append(eval_data['evaluation_number'])
+                        all_fitness.append(eval_data['fitness'])
+            
+            if all_evaluations and all_fitness:
+                # Create scatter plot
+                ax.scatter(all_evaluations, all_fitness, 
+                          s=20, alpha=0.6, c=colors[i], 
+                          label=algorithm, marker='o')
+        
+        ax.set_xlabel('Number of Fitness Evaluations')
+        ax.set_ylabel('Fitness Value')
+        ax.set_title('Fitness Evolution Progress - Individual Network Evaluations')
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+        
+        # Add trend lines for each algorithm
+        for i, (algorithm, runs) in enumerate(self.results.items()):
+            if not runs:
+                continue
+                
+            all_evaluations = []
+            all_fitness = []
+            
+            for run in runs:
+                if 'convergence_data' in run and 'evaluation_log' in run['convergence_data']:
+                    eval_log = run['convergence_data']['evaluation_log']
+                    for eval_data in eval_log:
+                        all_evaluations.append(eval_data['evaluation_number'])
+                        all_fitness.append(eval_data['fitness'])
+            
+            if len(all_evaluations) > 10:  # Only add trend line if we have enough points
+                # Sort by evaluation number
+                sorted_pairs = sorted(zip(all_evaluations, all_fitness))
+                sorted_evals, sorted_fitness = zip(*sorted_pairs)
+                
+                # Calculate moving average for trend line
+                window_size = max(10, len(sorted_fitness) // 50)
+                if len(sorted_fitness) >= window_size:
+                    moving_avg = np.convolve(sorted_fitness, 
+                                           np.ones(window_size)/window_size, 
+                                           mode='valid')
+                    moving_evals = sorted_evals[window_size-1:]
+                    ax.plot(moving_evals, moving_avg, 
+                           color=colors[i], linewidth=2, alpha=0.8,
+                           linestyle='--')
+        
+        plt.tight_layout()
+        plt.savefig(self.output_dir / 'fitness_evaluation_progress.png', 
+                   dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        print("Fitness evaluation progress plot saved")
+    
     def create_summary_table(self):
         """Create a summary table of results."""
         if not self.summary_data:
@@ -364,7 +493,7 @@ def main():
                         help='Output directory for plots')
     parser.add_argument('--plots', nargs='+',
                         choices=['performance', 'efficiency', 'convergence', 'fitness', 
-                                'runtime', 'architecture', 'individual', 'all'],
+                                'runtime', 'architecture', 'individual', 'progress', 'all'],
                         default=['all'], help='Which plots to generate')
     
     args = parser.parse_args()
@@ -396,6 +525,8 @@ def main():
             visualizer.plot_architecture_characteristics()
         if 'individual' in args.plots:
             visualizer.plot_individual_convergence()
+        if 'progress' in args.plots:
+            visualizer.plot_fitness_evaluation_progress()
     
     print("Visualization complete!")
 

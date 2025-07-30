@@ -1256,37 +1256,54 @@ def run_genetic_algorithm(dataset_name: str = "cifar10",
     # Run algorithm
     algorithm_start = time.time()
     
-    # Choose algorithm type with parallel support
-    if use_parallel and hasattr(fitness_evaluator, 'evaluate_population_parallel'):
-        if algorithm_type.upper() == "EGA":
+    # Choose algorithm type first to get logger
+    if algorithm_type.upper() == "EGA":
+        if use_parallel and device == "cuda":
             print("Using ParallelEnhancedGeneticAlgorithm")
             algorithm = ParallelEnhancedGeneticAlgorithm(
-                fitness_evaluator, input_shape, num_classes,
+                None, input_shape, num_classes,  # Pass None first, will set later
                 elite_size=5, **default_params
             )
         else:
-            print("Using ParallelGeneticAlgorithm")
-            algorithm = ParallelGeneticAlgorithm(
-                fitness_evaluator, input_shape, num_classes,
-                **default_params
-            )
-    else:
-        # Fall back to standard algorithms
-        if use_parallel:
-            print("Parallel processing requested but not available, using standard algorithms")
-        
-        if algorithm_type.upper() == "EGA":
             print("Using EnhancedGeneticAlgorithm")
             algorithm = EnhancedGeneticAlgorithm(
-                fitness_evaluator, input_shape, num_classes,
+                None, input_shape, num_classes,  # Pass None first, will set later
                 elite_size=5, **default_params
+            )
+    else:
+        if use_parallel and device == "cuda":
+            print("Using ParallelGeneticAlgorithm")
+            algorithm = ParallelGeneticAlgorithm(
+                None, input_shape, num_classes,  # Pass None first, will set later
+                **default_params
             )
         else:
             print("Using GeneticAlgorithm")
             algorithm = GeneticAlgorithm(
-                fitness_evaluator, input_shape, num_classes,
+                None, input_shape, num_classes,  # Pass None first, will set later
                 **default_params
             )
+    
+    # Now create fitness evaluator with logger
+    if use_parallel and device == "cuda":
+        print(f"Using ParallelFitnessEvaluator with batch size {parallel_batch_size}")
+        fitness_evaluator = ParallelFitnessEvaluator(
+            train_loader, val_loader, 
+            device=device,
+            batch_size=parallel_batch_size,
+            max_epochs_parallel=3,  # Fewer epochs for faster parallel training
+            logger=algorithm.logger  # Pass the logger
+        )
+    else:
+        print("Using standard FitnessEvaluator")
+        fitness_evaluator = FitnessEvaluator(
+            train_loader, val_loader, 
+            device=device,
+            logger=algorithm.logger  # Pass the logger
+        )
+    
+    # Set the fitness evaluator in the algorithm
+    algorithm.fitness_evaluator = fitness_evaluator
     
     print(f"Running {algorithm_type} on {dataset_name}")
     best_architecture, best_fitness = algorithm.run()
@@ -1301,7 +1318,7 @@ def run_genetic_algorithm(dataset_name: str = "cifar10",
     from training_utils import NetworkTrainer
     trainer = NetworkTrainer(device=device)
     test_results = trainer.train_and_evaluate(
-        best_architecture, train_loader, test_loader, epochs=20
+        best_architecture, train_loader, test_loader, epochs=5
     )
     
     final_eval_time = time.time() - final_eval_start

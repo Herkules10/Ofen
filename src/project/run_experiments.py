@@ -83,7 +83,7 @@ class ExperimentSuite:
                 'params': {
                     'algorithm_type': 'SA',
                     'initial_temperature': 100.0,
-                    'cooling_rate': 0.95,
+                    'cooling_rate': 0.981748,
                     'min_temperature': 0.01,
                     'max_iterations': 800,
                     'max_layers': 8
@@ -371,15 +371,15 @@ def main():
         for alg_config in experiment.algorithms.values():
             params = alg_config['params']
             if 'num_generations' in params:
-                params['num_generations'] = min(30, params['num_generations'])
+                params['num_generations'] = 40 # GA
             if 'num_iterations' in params:
-                params['num_iterations'] = min(30, params['num_iterations'])
+                params['num_iterations'] = 40 # PSO
             if 'max_iterations' in params:
-                params['max_iterations'] = min(10, params['max_iterations'])
+                params['max_iterations'] = 800 # SA
             if 'population_size' in params:
-                params['population_size'] = min(30, params['population_size'])
+                params['population_size'] = 20 # GA
             if 'swarm_size' in params:
-                params['swarm_size'] = min(30, params['swarm_size'])
+                params['swarm_size'] = 20 # PSO
     
     try:
         # Run experiments

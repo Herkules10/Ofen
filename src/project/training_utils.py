@@ -280,13 +280,15 @@ class FitnessEvaluator:
                  val_loader: DataLoader,
                  lambda1: float = 1e-6,  # Weight for parameter count
                  lambda2: float = 1.0,   # Weight for accuracy
-                 device: str = None):
+                 device: str = None,
+                 logger: 'ExperimentLogger' = None):  # New: Optional logger
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.lambda1 = lambda1
         self.lambda2 = lambda2
         self.trainer = NetworkTrainer(device)
         self.evaluation_cache = {}  # Cache to avoid re-evaluating identical architectures
+        self.logger = logger  # New: Store logger reference
     
     def evaluate_fitness(self, architecture: NetworkArchitecture) -> Dict[str, float]:
         """Evaluate fitness of an architecture."""
@@ -299,6 +301,11 @@ class FitnessEvaluator:
         if arch_hash in self.evaluation_cache:
             cached_result = self.evaluation_cache[arch_hash].copy()
             # print(f"    Cache hit! Fitness: {cached_result['fitness']:.4f}")
+            
+            # Log cached evaluation too!
+            if self.logger:
+                self.logger.log_individual_evaluation(cached_result['fitness'], architecture)
+            
             return cached_result
         
         print(f"    Training new architecture (layers: {len(architecture.layers)})...")
@@ -325,6 +332,10 @@ class FitnessEvaluator:
         print(f"    Training completed in {eval_time:.2f}s")
         print(f"    Results: acc={accuracy:.2f}%, params={param_count:,}, fitness={fitness:.4f}")
         
+        # Log individual evaluation if logger is available
+        if self.logger:
+            self.logger.log_individual_evaluation(fitness, architecture)
+        
         # Cache result
         self.evaluation_cache[arch_hash] = results.copy()
         
@@ -349,7 +360,8 @@ class ParallelFitnessEvaluator:
                  lambda2: float = 1.0,
                  device: str = None,
                  batch_size: int = 4,  # Number of architectures to train in parallel
-                 max_epochs_parallel: int = 5):  # Reduced epochs for parallel training
+                 max_epochs_parallel: int = 5,  # Reduced epochs for parallel training
+                 logger: 'ExperimentLogger' = None):  # New: Optional logger
         
         self.train_loader = train_loader
         self.val_loader = val_loader
@@ -357,6 +369,7 @@ class ParallelFitnessEvaluator:
         self.lambda2 = lambda2
         self.batch_size = batch_size
         self.max_epochs_parallel = max_epochs_parallel
+        self.logger = logger  # New: Store logger reference
         
         if device is None:
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -364,6 +377,8 @@ class ParallelFitnessEvaluator:
             self.device = torch.device(device)
             
         self.evaluation_cache = {}
+        self.failed_builds = 0  # Track failed network builds
+        self.skipped_large_networks = 0  # Track networks skipped due to size
         
         # Prepare limited data for faster parallel training
         self._prepare_training_data()
@@ -454,6 +469,10 @@ class ParallelFitnessEvaluator:
         for idx, result in cached_results:
             all_results[idx] = result
             
+            # Log cached evaluations too!
+            if self.logger:
+                self.logger.log_individual_evaluation(result['fitness'], architectures[idx])
+            
         # Fill uncached results
         for i, result in enumerate(uncached_results):
             original_idx = uncached_indices[i]
@@ -483,9 +502,11 @@ class ParallelFitnessEvaluator:
                 
                 # Skip if too many parameters
                 if param_count > 2_000_000:  # Lower threshold for parallel training
+                    print(f"      Skipping network {i}: too many parameters ({param_count:,})")
                     networks.append(None)
                     optimizers.append(None)
                     param_counts.append(param_count)
+                    self.skipped_large_networks += 1
                     continue
                 
                 optimizer = torch.optim.Adam(network.parameters(), lr=0.001, weight_decay=1e-4)
@@ -496,9 +517,11 @@ class ParallelFitnessEvaluator:
                 
             except Exception as e:
                 print(f"      Failed to build network {i}: {e}")
+                print(f"      DEBUG: Incrementing failed_builds from {self.failed_builds} to {self.failed_builds + 1}")
                 networks.append(None)
                 optimizers.append(None)
                 param_counts.append(0)
+                self.failed_builds += 1
         
         # Train all networks in parallel
         criterion = torch.nn.CrossEntropyLoss()
@@ -506,14 +529,20 @@ class ParallelFitnessEvaluator:
         
         for i, (network, optimizer, param_count) in enumerate(zip(networks, optimizers, param_counts)):
             if network is None:
-                results.append({
+                result = {
                     'accuracy': 0.0,
                     'loss': float('inf'),
                     'parameter_count': param_count,
                     'training_time': 0.0,
                     'fitness': 0.0,
                     'efficiency': 0.0
-                })
+                }
+                
+                # Log individual evaluation even for failed builds
+                if self.logger:
+                    self.logger.log_individual_evaluation(0.0, architectures[i])
+                
+                results.append(result)
                 continue
             
             # Train this network
@@ -523,17 +552,28 @@ class ParallelFitnessEvaluator:
             fitness = self.lambda2 * best_accuracy - self.lambda1 * param_count
             efficiency = best_accuracy / (param_count / 1000) if param_count > 0 else 0
             
-            results.append({
+            result = {
                 'accuracy': best_accuracy,
                 'loss': 0.0,  # Not tracking loss in parallel mode
                 'parameter_count': param_count,
                 'training_time': 0.0,  # Batch time, not individual
                 'fitness': fitness,
                 'efficiency': efficiency
-            })
+            }
+            
+            # Log individual evaluation if logger is available
+            if self.logger:
+                self.logger.log_individual_evaluation(fitness, architectures[i])
+            
+            results.append(result)
         
         batch_time = time.time() - batch_start
         print(f"    Batch training completed in {batch_time:.2f}s ({batch_time/len(architectures):.2f}s per arch)")
+        
+        if hasattr(self, 'failed_builds') and self.failed_builds > 0:
+            print(f"    Total failed builds so far: {self.failed_builds}")
+        if hasattr(self, 'skipped_large_networks') and self.skipped_large_networks > 0:
+            print(f"    Total skipped large networks so far: {self.skipped_large_networks}")
         
         # Clear GPU memory
         for network in networks:
@@ -603,6 +643,8 @@ class ExperimentLogger:
         self.experiment_name = experiment_name
         self.results = []
         self.best_architectures = []
+        self.evaluation_log = []  # New: Track individual evaluations
+        self.evaluation_count = 0  # New: Track total evaluations
     
     def log_generation(self, generation: int, population_fitness: list, best_architecture: NetworkArchitecture, best_fitness: float):
         """Log results for a generation/iteration."""
@@ -617,12 +659,31 @@ class ExperimentLogger:
         self.results.append(gen_stats)
         
         # Store best architecture
-        if not self.best_architectures or best_fitness > max(r['best_fitness'] for r in self.results[:-1]):
+        if not self.best_architectures or best_fitness > max(r['best_fitness'] for r in self.results[:-1] if r['best_fitness'] is not None):
             self.best_architectures.append({
                 'generation': generation,
                 'architecture': best_architecture.copy(),
                 'fitness': best_fitness
             })
+    
+    def log_individual_evaluation(self, fitness: float, architecture: NetworkArchitecture = None, 
+                                 generation: int = None, individual_id: int = None):
+        """Log individual fitness evaluation for progress tracking."""
+        self.evaluation_count += 1
+        evaluation_data = {
+            'evaluation_number': self.evaluation_count,
+            'fitness': fitness,
+            'generation': generation,
+            'individual_id': individual_id
+        }
+        
+        if architecture:
+            evaluation_data.update({
+                'num_layers': len(architecture.layers),
+                'num_parameters': architecture.get_parameter_count()
+            })
+        
+        self.evaluation_log.append(evaluation_data)
     
     def get_convergence_data(self) -> Dict:
         """Get convergence data for plotting."""
@@ -632,7 +693,9 @@ class ExperimentLogger:
             'avg_fitness': [r['avg_fitness'] for r in self.results],
             'std_fitness': [r['std_fitness'] for r in self.results],
             'num_layers': [r['architecture_layers'] for r in self.results],
-            'num_params': [r['architecture_params'] for r in self.results]
+            'num_params': [r['architecture_params'] for r in self.results],
+            'evaluation_log': self.evaluation_log,  # New: Individual evaluations
+            'total_evaluations': self.evaluation_count  # New: Total evaluation count
         }
     
     def save_results(self, filename: str):
@@ -642,7 +705,9 @@ class ExperimentLogger:
             pickle.dump({
                 'experiment_name': self.experiment_name,
                 'results': self.results,
-                'best_architectures': self.best_architectures
+                'best_architectures': self.best_architectures,
+                'evaluation_log': self.evaluation_log,
+                'total_evaluations': self.evaluation_count
             }, f)
     
     def load_results(self, filename: str):
@@ -653,3 +718,6 @@ class ExperimentLogger:
             self.experiment_name = data['experiment_name']
             self.results = data['results']
             self.best_architectures = data['best_architectures']
+            # Handle backward compatibility
+            self.evaluation_log = data.get('evaluation_log', [])
+            self.evaluation_count = data.get('total_evaluations', 0)
