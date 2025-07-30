@@ -1,0 +1,34 @@
+GA:
+'params': {
+                    'algorithm_type': 'GA',
+                    'population_size': 40,
+                    'num_generations': 30,
+                    'crossover_prob': 0.7,
+                    'mutation_add_prob': 0.15,
+                    'mutation_del_prob': 0.1,
+                    'mutation_param_prob': 0.2,
+                    'tournament_size': 3,
+                    'max_layers': 8
+                }
+
+PSO:
+'params': {
+                    'swarm_size': 40,
+                    'num_iterations': 30,
+                    'w': 0.9,
+                    'c1': 2.2,
+                    'c2': 1.2,
+                    'max_layers': 8,
+                    'use_parallel': True,
+                    'parallel_batch_size': 4
+                }
+
+SA:
+'params': {
+                    'algorithm_type': 'SA',
+                    'initial_temperature': 100.0,
+                    'cooling_rate': 0.981748,
+                    'min_temperature': 0.01,
+                    'max_iterations': 800,
+                    'max_layers': 8
+                }

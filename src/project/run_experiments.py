@@ -40,12 +40,12 @@ class ExperimentSuite:
                 'function': run_genetic_algorithm,
                 'params': {
                     'algorithm_type': 'GA',
-                    'population_size': 30,
-                    'num_generations': 40,
+                    'population_size': 40,
+                    'num_generations': 30,
                     'crossover_prob': 0.7,
-                    'mutation_add_prob': 0.15,
-                    'mutation_del_prob': 0.1,
-                    'mutation_param_prob': 0.2,
+                    'mutation_add_prob': 0.45,
+                    'mutation_del_prob': 0.3,
+                    'mutation_param_prob': 0.6 ,
                     'tournament_size': 3,
                     'max_layers': 8
                 }
@@ -54,8 +54,8 @@ class ExperimentSuite:
                 'function': run_genetic_algorithm,
                 'params': {
                     'algorithm_type': 'EGA',
-                    'population_size': 30,
-                    'num_generations': 40,
+                    'population_size': 40,
+                    'num_generations': 30,
                     'crossover_prob': 0.6,
                     'mutation_add_prob': 0.15,
                     'mutation_del_prob': 0.1,
@@ -68,11 +68,11 @@ class ExperimentSuite:
             'PSO': {
                 'function': run_particle_swarm_optimization,
                 'params': {
-                    'swarm_size': 25,
-                    'num_iterations': 80,
-                    'w': 0.9,
-                    'c1': 2.2,
-                    'c2': 1.2,
+                    'swarm_size': 40,
+                    'num_iterations': 30,
+                    'w': 0.4,
+                    'c1': 2.5,
+                    'c2': 2.5,
                     'max_layers': 8,
                     'use_parallel': True,
                     'parallel_batch_size': 4
@@ -83,7 +83,7 @@ class ExperimentSuite:
                 'params': {
                     'algorithm_type': 'SA',
                     'initial_temperature': 100.0,
-                    'cooling_rate': 0.981748,
+                    'cooling_rate': 0.9,
                     'min_temperature': 0.01,
                     'max_iterations': 800,
                     'max_layers': 8
