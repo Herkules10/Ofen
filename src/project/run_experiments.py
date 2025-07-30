@@ -371,15 +371,15 @@ def main():
         for alg_config in experiment.algorithms.values():
             params = alg_config['params']
             if 'num_generations' in params:
-                params['num_generations'] = 20 # GA
+                params['num_generations'] = 30 # GA
             if 'num_iterations' in params:
-                params['num_iterations'] = 20 # PSO
+                params['num_iterations'] = 30 # PSO
             if 'max_iterations' in params:
-                params['max_iterations'] = 400 # SA
+                params['max_iterations'] = 1200 # SA
             if 'population_size' in params:
-                params['population_size'] = 20 # GA
+                params['population_size'] = 40 # GA
             if 'swarm_size' in params:
-                params['swarm_size'] = 20 # PSO
+                params['swarm_size'] = 40 # PSO
     
     try:
         # Run experiments

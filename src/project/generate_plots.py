@@ -131,11 +131,9 @@ class ResultsVisualizer:
         plt.close()
     
     def plot_parameter_efficiency(self):
-        """Plot parameter efficiency (accuracy per parameter)."""
+        """Plot parameter efficiency (accuracy per parameter) - creates both auto-scaled and 0-100% versions."""
         if not self.summary_data:
             return
-        
-        fig, ax = plt.subplots(figsize=(10, 6))
         
         algorithms = list(self.summary_data.keys())
         accuracies = [self.summary_data[alg]['test_accuracy']['mean'] for alg in algorithms]
@@ -144,6 +142,9 @@ class ResultsVisualizer:
         # Use consistent colors
         colors = self._get_algorithm_colors(algorithms)
         
+        # Create first plot with automatic scaling (original version)
+        fig, ax = plt.subplots(figsize=(10, 6))
+        
         # Scatter plot
         for i, (alg, acc, params) in enumerate(zip(algorithms, accuracies, param_counts)):
             ax.scatter(params, acc, s=150, c=colors[i], label=alg, alpha=0.8)
@@ -151,12 +152,31 @@ class ResultsVisualizer:
         
         ax.set_xlabel('Parameter Count (thousands)')
         ax.set_ylabel('Test Accuracy (%)')
-        ax.set_title('Parameter Efficiency: Accuracy vs Model Size')
+        ax.set_title('Parameter Efficiency: Accuracy vs Model Size (Auto-scaled)')
         ax.grid(True, alpha=0.3)
         ax.legend()
         
         plt.tight_layout()
-        plt.savefig(self.output_dir / 'parameter_efficiency.png', dpi=300, bbox_inches='tight')
+        plt.savefig(self.output_dir / 'parameter_efficiency_auto.png', dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        # Create second plot with 0-100% y-axis scaling
+        fig, ax = plt.subplots(figsize=(10, 6))
+        
+        # Scatter plot
+        for i, (alg, acc, params) in enumerate(zip(algorithms, accuracies, param_counts)):
+            ax.scatter(params, acc, s=150, c=colors[i], label=alg, alpha=0.8)
+            ax.annotate(alg, (params, acc), xytext=(5, 5), textcoords='offset points')
+        
+        ax.set_xlabel('Parameter Count (thousands)')
+        ax.set_ylabel('Test Accuracy (%)')
+        ax.set_ylim(0, 100)  # Set y-axis range from 0 to 100%
+        ax.set_title('Parameter Efficiency: Accuracy vs Model Size (0-100% Scale)')
+        ax.grid(True, alpha=0.3)
+        ax.legend()
+        
+        plt.tight_layout()
+        plt.savefig(self.output_dir / 'parameter_efficiency_0to100.png', dpi=300, bbox_inches='tight')
         plt.close()
     
     def plot_convergence_curves(self):
