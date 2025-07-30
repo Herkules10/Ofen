@@ -323,7 +323,18 @@ class FitnessEvaluator:
         param_count = results['parameter_count']
         
         # Multi-objective fitness: maximize accuracy, minimize parameters
-        fitness = self.lambda2 * accuracy - self.lambda1 * param_count
+        # Apply stronger penalty for large networks to guide PSO away from them
+        if param_count > 2_000_000:  # Networks approaching the limit
+            # Apply exponential penalty for very large networks
+            size_penalty = self.lambda1 * param_count * 10  # 10x stronger penalty
+        elif param_count > 1_000_000:  # Medium-large networks
+            # Apply moderate penalty
+            size_penalty = self.lambda1 * param_count * 3  # 3x penalty
+        else:
+            # Normal penalty for reasonably-sized networks
+            size_penalty = self.lambda1 * param_count
+        
+        fitness = self.lambda2 * accuracy - size_penalty
         
         results['fitness'] = fitness
         results['efficiency'] = accuracy / (param_count / 1000) if param_count > 0 else 0
@@ -548,8 +559,18 @@ class ParallelFitnessEvaluator:
             # Train this network
             best_accuracy = self._train_single_network_fast(network, optimizer, criterion)
             
-            # Calculate fitness
-            fitness = self.lambda2 * best_accuracy - self.lambda1 * param_count
+            # Calculate fitness with improved penalty system
+            if param_count > 2_000_000:  # Networks approaching the limit
+                # Apply exponential penalty for very large networks
+                size_penalty = self.lambda1 * param_count * 10  # 10x stronger penalty
+            elif param_count > 1_000_000:  # Medium-large networks
+                # Apply moderate penalty
+                size_penalty = self.lambda1 * param_count * 3  # 3x penalty
+            else:
+                # Normal penalty for reasonably-sized networks
+                size_penalty = self.lambda1 * param_count
+            
+            fitness = self.lambda2 * best_accuracy - size_penalty
             efficiency = best_accuracy / (param_count / 1000) if param_count > 0 else 0
             
             result = {

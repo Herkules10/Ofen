@@ -70,9 +70,9 @@ class ExperimentSuite:
                 'params': {
                     'swarm_size': 25,
                     'num_iterations': 80,
-                    'w': 0.7,
-                    'c1': 2.0,
-                    'c2': 2.0,
+                    'w': 0.9,
+                    'c1': 2.2,
+                    'c2': 1.2,
                     'max_layers': 8,
                     'use_parallel': True,
                     'parallel_batch_size': 4
@@ -371,11 +371,11 @@ def main():
         for alg_config in experiment.algorithms.values():
             params = alg_config['params']
             if 'num_generations' in params:
-                params['num_generations'] = 40 # GA
+                params['num_generations'] = 20 # GA
             if 'num_iterations' in params:
-                params['num_iterations'] = 40 # PSO
+                params['num_iterations'] = 20 # PSO
             if 'max_iterations' in params:
-                params['max_iterations'] = 800 # SA
+                params['max_iterations'] = 400 # SA
             if 'population_size' in params:
                 params['population_size'] = 20 # GA
             if 'swarm_size' in params:

@@ -379,6 +379,16 @@ class ResultsVisualizer:
             print("No results available for fitness evaluation progress plot")
             return
         
+        # Create combined plot
+        self._plot_combined_fitness_evaluation_progress()
+        
+        # Create individual plots for each algorithm
+        self._plot_individual_fitness_evaluation_progress()
+        
+        print("Fitness evaluation progress plots saved")
+    
+    def _plot_combined_fitness_evaluation_progress(self):
+        """Create combined fitness evaluation progress plot for all algorithms."""
         fig, ax = plt.subplots(figsize=(12, 8))
         
         # Use consistent colors
@@ -408,8 +418,8 @@ class ResultsVisualizer:
         
         ax.set_xlabel('Number of Fitness Evaluations')
         ax.set_ylabel('Fitness Value')
-        ax.set_title('Fitness Evolution Progress - Individual Network Evaluations')
-        ax.legend()
+        ax.set_title('Fitness Evolution Progress - Individual Network Evaluations (All Algorithms)')
+        ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
         ax.grid(True, alpha=0.3)
         
         # Add trend lines for each algorithm
@@ -444,11 +454,50 @@ class ResultsVisualizer:
                            linestyle='--')
         
         plt.tight_layout()
-        plt.savefig(self.output_dir / 'fitness_evaluation_progress.png', 
+        plt.savefig(self.output_dir / 'fitness_evaluation_progress_combined.png', 
                    dpi=300, bbox_inches='tight')
         plt.close()
+    
+    def _plot_individual_fitness_evaluation_progress(self):
+        """Create individual fitness evaluation progress plots for each algorithm."""
+        algorithm_names = list(self.results.keys())
+        colors = self._get_algorithm_colors(algorithm_names)
         
-        print("Fitness evaluation progress plot saved")
+        for i, (algorithm, runs) in enumerate(self.results.items()):
+            if not runs:
+                continue
+            
+            fig, ax = plt.subplots(figsize=(12, 8))
+            
+            # Collect all evaluation data from all runs
+            all_evaluations = []
+            all_fitness = []
+            
+            for run in runs:
+                if 'convergence_data' in run and 'evaluation_log' in run['convergence_data']:
+                    eval_log = run['convergence_data']['evaluation_log']
+                    for eval_data in eval_log:
+                        all_evaluations.append(eval_data['evaluation_number'])
+                        all_fitness.append(eval_data['fitness'])
+            
+            if all_evaluations and all_fitness:
+                # Create scatter plot with same styling as combined graph
+                ax.scatter(all_evaluations, all_fitness, 
+                          s=20, alpha=0.6, c=colors[i], 
+                          label=algorithm, marker='o')
+            
+            ax.set_xlabel('Number of Fitness Evaluations')
+            ax.set_ylabel('Fitness Value')
+            ax.set_title(f'{algorithm} - Fitness Evolution Progress')
+            ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+            ax.grid(True, alpha=0.3)
+            
+            plt.tight_layout()
+            plt.savefig(self.output_dir / f'fitness_evaluation_progress_{algorithm}.png', 
+                       dpi=300, bbox_inches='tight')
+            plt.close()
+        
+        print(f"Individual fitness evaluation progress plots saved for {len(self.results)} algorithms")
     
     def create_summary_table(self):
         """Create a summary table of results."""

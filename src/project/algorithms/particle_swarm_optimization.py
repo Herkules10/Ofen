@@ -65,7 +65,7 @@ class Particle:
 class ArchitectureDecoder:
     """Decodes continuous PSO positions into discrete neural architectures."""
     
-    def __init__(self, input_shape: Tuple[int, ...], num_classes: int, max_layers: int = 10):
+    def __init__(self, input_shape: Tuple[int, ...], num_classes: int, max_layers: int = 6):  # Reduced from 10 to 6
         self.input_shape = input_shape
         self.num_classes = num_classes
         self.max_layers = max_layers
@@ -127,16 +127,28 @@ class ArchitectureDecoder:
             layer_config = self._decode_layer(position, layer_idx, architecture)
             if layer_config and not architecture.add_layer(layer_config):
                 break  # Stop if layer cannot be added
+            
+            # Early parameter count check to prevent overly large networks
+            try:
+                current_param_count = architecture.get_parameter_count()
+                # Use a conservative limit to avoid getting close to the training thresholds
+                if current_param_count > 1_000_000:  # 1M parameter limit during construction
+                    print(f"      Early stopping architecture construction at {current_param_count:,} parameters (layer {layer_idx})")
+                    break
+            except Exception as e:
+                # If parameter count calculation fails, continue building
+                print(f"      Warning: Could not calculate parameter count during construction: {e}")
+                pass
         
         # Ensure at least one meaningful layer
         if len(architecture.layers) == 0:
             # Add a default conv layer for images or FC for other data
             if len(self.input_shape) == 3:
                 default_layer = LayerConfig(LayerType.CONV2D, {
-                    'filters': 32, 'kernel_size': 3, 'stride': 1, 'padding': 1
+                    'filters': 16, 'kernel_size': 3, 'stride': 1, 'padding': 1  # Smaller default
                 })
             else:
-                default_layer = LayerConfig(LayerType.FC, {'units': 128})
+                default_layer = LayerConfig(LayerType.FC, {'units': 64})  # Smaller default
             architecture.add_layer(default_layer)
         
         return architecture
@@ -175,8 +187,9 @@ class ArchitectureDecoder:
         
         # Create layer configuration based on type
         if layer_type == LayerType.CONV2D:
-            filters_options = [16, 32, 64, 128, 256]
-            kernel_options = [3, 5, 7]
+            # Reduced filter options to prevent overly large networks
+            filters_options = [8, 16, 32, 64]  # Reduced max from 256 to 64
+            kernel_options = [3, 5]  # Reduced options to avoid very large kernels
             stride_options = [1, 2]
             
             # Safe indexing to prevent out of bounds errors
@@ -192,8 +205,9 @@ class ArchitectureDecoder:
             })
         
         elif layer_type == LayerType.CONV1D:
-            filters_options = [16, 32, 64, 128]
-            kernel_options = [3, 5, 7]
+            # Reduced filter options to prevent overly large networks
+            filters_options = [8, 16, 32, 64]  # Reduced max from 128 to 64
+            kernel_options = [3, 5]  # Reduced options
             stride_options = [1, 2]
             
             # Safe indexing to prevent out of bounds errors
@@ -209,7 +223,8 @@ class ArchitectureDecoder:
             })
         
         elif layer_type == LayerType.FC:
-            units_options = [64, 128, 256, 512, 1024]
+            # Significantly reduced units options to prevent parameter explosion
+            units_options = [32, 64, 128, 256]  # Reduced max from 1024 to 256
             units_idx = min(int(param1 * len(units_options)), len(units_options) - 1)
             return LayerConfig(LayerType.FC, {
                 'units': units_options[units_idx]
@@ -246,12 +261,25 @@ class ArchitectureDecoder:
         possible = []
         
         if len(current_shape) == 3:  # After conv layers
-            possible.extend([LayerType.CONV2D, LayerType.MAXPOOL, LayerType.FC])
+            # Encourage more pooling layers early to reduce spatial dimensions
+            if num_existing_layers < 3:
+                # Early layers: favor conv and pooling more
+                possible.extend([LayerType.CONV2D, LayerType.MAXPOOL, LayerType.MAXPOOL])  # Double pooling chance
+            else:
+                # Later layers: can add FC
+                possible.extend([LayerType.CONV2D, LayerType.MAXPOOL, LayerType.FC])
+            
             if num_existing_layers > 0:
                 possible.extend([LayerType.BATCHNORM, LayerType.DROPOUT, LayerType.ACTIVATION])
         
         elif len(current_shape) == 2:  # After 1D conv
-            possible.extend([LayerType.CONV1D, LayerType.MAXPOOL, LayerType.FC])
+            if num_existing_layers < 3:
+                # Early layers: favor conv and pooling more
+                possible.extend([LayerType.CONV1D, LayerType.MAXPOOL, LayerType.MAXPOOL])  # Double pooling chance
+            else:
+                # Later layers: can add FC
+                possible.extend([LayerType.CONV1D, LayerType.MAXPOOL, LayerType.FC])
+            
             if num_existing_layers > 0:
                 possible.extend([LayerType.BATCHNORM, LayerType.DROPOUT, LayerType.ACTIVATION])
         
@@ -274,7 +302,7 @@ class ParticleSwarmOptimization:
                  w: float = 0.7,
                  c1: float = 2.0,
                  c2: float = 2.0,
-                 max_layers: int = 10):
+                 max_layers: int = 6):  # Reduced from 10 to 6
         
         self.fitness_evaluator = fitness_evaluator
         self.input_shape = input_shape
