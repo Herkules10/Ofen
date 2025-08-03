@@ -32,10 +32,10 @@ def run_parametric_optimization():
         
         # Run analysis if requested
         try:
-            from parametric_analysis import ParametricAnalyzer
+            from parametric_analysis import EnhancedParametricAnalyzer
             
             print("\n📊 Running analysis...")
-            analyzer = ParametricAnalyzer("parametric_results", "parametric_figures")
+            analyzer = EnhancedParametricAnalyzer("parametric_results", "parametric_figures")
             analyzer.analyze_all()
             
             print("📁 Analysis plots saved to: parametric_figures/")
@@ -115,10 +115,10 @@ def main():
     # Run analysis only if requested
     if args.analysis_only:
         try:
-            from parametric_analysis import ParametricAnalyzer
+            from parametric_analysis import EnhancedParametricAnalyzer
             
             print("📊 Running analysis only...")
-            analyzer = ParametricAnalyzer("parametric_results", "parametric_figures")
+            analyzer = EnhancedParametricAnalyzer("parametric_results", "parametric_figures")
             analyzer.analyze_all()
             
             print("📁 Analysis plots saved to: parametric_figures/")

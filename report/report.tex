@@ -52,9 +52,9 @@ style=ieee,
         \frametitle{Introduction - Problem Description}
         \begin{itemize}
             \item \textbf{Given} an image-based dataset with $n$ data points $d_1, d_2, ..., d_n \in \mathbb{R}^{H \times W \times C}$, where $H, W, C$ represent height, width and channels respectively, and $n \in \mathbb{N}$ represents the number of samples.
-               \item \textbf{Find} $\alpha = {(\alpha_1, \alpha_2, ..., \alpha_n)}^\top \in \mathcal{D}^n$ which minimizes 
+               \item \textbf{Find} $\alpha = {(\alpha_1, \alpha_2, ..., \alpha_n)}^\top \in \mathcal{D}^n$ which maximizes
                 \begin{align*}
-                    f\left(\alpha, \mathcal{D}\right) := \lambda_1 \cdot \text{NetworkSize}(\alpha) - \lambda_2 \cdot \text{Accuracy}(\alpha, \mathcal{D})
+                    f\left(\alpha, \mathcal{D}\right) := \lambda_2 \cdot \text{Accuracy}(\alpha, \mathcal{D}) - \lambda_1 \cdot \text{NetworkSize}(\alpha)
                 \end{align*} \\
                 Where: \\ 
                 \begin{itemize}
@@ -82,6 +82,7 @@ style=ieee,
         Unlike traditional approaches that only focus on fully connected layers, we extend the search space to include the following layers:
         \begin{itemize}
             \item \textbf{Convolutional Layers (Conv1D/Conv2D):} Feature extraction with learnable filters
+            \item \textbf{Fully Connected Layers (FC):} Dense layers for classification
             \item \textbf{Batch Normalization:} Normalization of the values for training stability
             \item \textbf{Max Pooling:} Spatial dimension reduction
             \item \textbf{Dropout:} Regularization technique to avoid overfitting
@@ -93,7 +94,7 @@ style=ieee,
     \begin{frame}
         \frametitle{Introduction - Solution Space Characteristics}
         \begin{itemize}
-            \item Non-linear cost function $f\left(\alpha, \mathcal{D}\right) := \lambda_1 \cdot \text{NetworkSize}(\alpha) - \lambda_2 \cdot \text{Accuracy}(\alpha, \mathcal{D})$ combines discrete network size with continuous accuracy metrics
+            \item Non-linear cost function $f\left(\alpha, \mathcal{D}\right) := \lambda_2 \cdot \text{Accuracy}(\alpha, \mathcal{D}) - \lambda_1 \cdot \text{NetworkSize}(\alpha)$ combines discrete network size with continuous accuracy metrics
             \item Mixed discrete-continuous solution space consisting of architecture topology (discrete) and hyperparameters (continuous)
             \item Solution space can be represented by encoding each architecture $\alpha$ as a variable-length chromosome
             \item \textbf{Naive Approach:} Exhaustive search with runtime $\mathcal{O}(C^L)$ for $L$ max layers with $C$ component types becomes intractable for realtistic network sizes
@@ -104,7 +105,7 @@ style=ieee,
     \begin{frame}
         \frametitle{Introduction - Project Objectives}
         \begin{itemize}
-            \item Investigate how \textbf{Genetic Algorithms (GA)}, \textbf{Enhanced Genetic Algorithms (EGA)}, \textbf{Particle Swarm Optimization (PSO)} and \textbf{Simulated Annealing (SA)} perform when applied to the problem.
+            \item Investigate how \textbf{Genetic Algorithms (GA)}, \textbf{Particle Swarm Optimization (PSO)}, and \textbf{Simulated Annealing (SA)} perform when applied to the problem.
             \item Balance the trade-off between network size and accuracy
             \item Evaluate the effectiveness of different layer types in automated architecture design
             \item Assess the performance of these algorithms by comparing them to baseline methods, such as \textbf{Random Search (RS)} and \textbf{Grid Search (GS)}.
@@ -121,46 +122,46 @@ style=ieee,
         \vspace{2mm}
         \textbf{Random Search (RS)} \\
         {\small
-        \textbf{Cost function:} $f(\alpha^{(i)}) = \lambda_1 \cdot \text{NetworkSize}(\alpha^{(i)}) - \lambda_2 \cdot \text{Accuracy}(\alpha^{(i)}, \mathcal{D})$
+        \textbf{Cost function:} $f(\alpha^{(i)}) = \lambda_2 \cdot \text{Accuracy}(\alpha^{(i)}, \mathcal{D}) - \lambda_1 \cdot \text{NetworkSize}(\alpha^{(i)})$ 
         \begin{enumerate}
             \item Generate $N$ random candidate architectures $\alpha^{(1)}, ..., \alpha^{(N)}$
             \item Train each network and evaluate $f(\alpha^{(i)})$ for $i = 1, 2, ..., N$
-            \item Return $\alpha^{(best, RS)}$ with $f(\alpha^{(best, RS)}) \leq f(\alpha^{(i)}), \forall \alpha^{(i)}$
+            \item Return $(\alpha^{(best, RS)}, f(\alpha^{(best, RS)}))$ with $f(\alpha^{(best, RS)}) \geq f(\alpha^{(i)}), \forall \alpha^{(i)}$
         \end{enumerate}}
         \vspace{2mm}
         \textbf{Grid Search (GS)} \\
         {\small
-            \textbf{Cost function:} $f(\alpha^{(i)}) = \lambda_1 \cdot \text{NetworkSize}(\alpha^{(i)}) - \lambda_2 \cdot \text{Accuracy}(\alpha^{(i)}, \mathcal{D})$
+            \textbf{Cost function:} $f(\alpha^{(i)}) = \lambda_2 \cdot \text{Accuracy}(\alpha^{(i)}, \mathcal{D}) - \lambda_1 \cdot \text{NetworkSize}(\alpha^{(i)})$ 
             \begin{enumerate}
                 \item Define systematic grid over architecture hyperparameters 
                 \item Evaluate $f(\alpha^{(i)})$ for each grid point $\alpha^{(i)}$
-                \item Return $\alpha^{(best, GS)}$ with minimal cost
+                \item Return $(\alpha^{(best, GS)}, f(\alpha^{(best, GS)}))$ with maximal fitness
             \end{enumerate}}
     \end{frame}
 
-    % Slide 8
+    % Slide 7
     \begin{frame}
         \frametitle{Algorithms - Genetic Algorithm}
         \textbf{Genetic Algorithm (GA) \cite{idrissi_genetic_2016}}: \\
         {
-            \small
-            \textbf{Fitness function:} $-f(\alpha^{(i)}) = \lambda_1 \cdot \text{NetworkSize}(\alpha^{(i)}) - \lambda_2 \cdot \text{Accuracy}(\alpha^{(i)}, \mathcal{D})$
+            \footnotesize
+            \textbf{Fitness function:} $fitness = \lambda_2 \cdot \text{Accuracy}(\alpha^{(i)}, \mathcal{D}) - \lambda_1 \cdot \text{NetworkSize}(\alpha^{(i)})$
             
             \textbf{Encoding:} Variable-length chromosomes representing layer sequences
             \begin{itemize}
-                \item Gene type: \{Conv2D, Conv1D, FC, BatchNorm, MaxPool, Dropout\}
-                \item Gene parameters: kernel\_size, stride, filters, etc.
+                \item Gene type: \{Conv2D, Conv1D, FC, BatchNorm, MaxPool, Dropout, Activation\}
+                \item Gene parameters: kernel\_size, stride, filters, units, etc.
             \end{itemize}
 
             \textbf{Algorithm Steps:}
             \begin{enumerate}
-                \item Create \texttt{n\_pop} random architectures $\alpha^{(i)} = (layer_1, layer_2, ..., layer_k)$
+                \item Create \texttt{population\_size} random architectures $\alpha^{(i)} = (layer_1, layer_2, ..., layer_k)$
                 \item Train networks and compute fitness scores
                 \item Tournament selection with \texttt{tournament\_size} individuals
-                \item Single-point crossover with probability \texttt{cxpb}, preserving valid layer sequences 
-                \item Add/remove layers with probability \texttt{mut\_add} / \texttt{mut\_del} and modify layer parameters with probability \texttt{mut\_param}
-                \item Generate new population, repeat for \texttt{n\_gen} generations
-                \item Return $\alpha^{\left(best, (E)GA\right)}$
+                \item Single-point crossover with probability \texttt{crossover\_prob}, preserving valid layer sequences 
+                \item Add/remove layers with probability \texttt{mutation\_add\_prob} / \texttt{mutation\_del\_prob} and modify layer parameters with probability \texttt{mutation\_param\_prob}
+                \item Generate new population, repeat for \texttt{num\_generations} generations
+                \item Return $(\alpha^{(best, GA)}, fitness^{(best, GA)})$
             \end{enumerate}
         }
     \end{frame}
@@ -190,14 +191,14 @@ style=ieee,
                 \item Convert positions to architectures and train the networks 
                 \item Update personal best $pbest^{(i)}$ and global best $gbest$ 
                 \item Update velocities and positions 
-                \item Repeat for \texttt{n\_iter} iterations 
-                \item Return $\alpha^{(best, PSO)}$ 
+                \item Repeat for \texttt{num\_iterations} iterations 
+                \item Return $(\alpha^{(best, PSO)}, fitness^{(best, PSO)})$ 
             \end{enumerate}
 
         }
     \end{frame}
     
-    % Slide 7
+    % Slide 10
     \begin{frame}
         \frametitle{Algorithms - Simulated Annealing}
         \textbf{Simulated Annealing (SA) \cite{kuo_neural_2022}:} \\
@@ -221,9 +222,9 @@ style=ieee,
                     \item If $f(\alpha_\text{neighbour}) < f(\alpha_\text{current})$: accept 
                     \item Else: Accept with probability $e^{-\left(\frac{f(\alpha_\text{neighbour}) - f(\alpha_\text{current})}{T}\right)}$
                 \end{itemize}
-                \item Reduce temperature $T = T_0 \cdot \text{\texttt{cooling\_rate}}^\text{\texttt{iteration}}$
+                \item Reduce temperature $T = T \cdot \text{\texttt{cooling\_rate}}$ every 10 iterations
                 \item Repeat until convergence or \texttt{max\_iterations}
-                \item Return $\alpha^{(best, SA)}$
+                \item Return $(\alpha^{(best, SA)}, fitness^{(best, SA)})$
             \end{enumerate}
         }
     \end{frame}
@@ -232,17 +233,17 @@ style=ieee,
 
     % Slide TBD
     \begin{frame}
-        \frametitle{Parametric Optimization}
+        \frametitle{Parametric Optimization - Variable Parameters}
         All algorithms run on variable parameters: 
         \begin{itemize}
-            \item Variable parameters for (E)GA:
+            \item Variable parameters for GA:
             \begin{table}[h]
                 \tiny
-                \begin{tabular}{@{}p{1.5cm}p{1.2cm}p{1.2cm}p{1.2cm}p{1.2cm}@{}}
+                \begin{tabular}{@{}p{1.4cm}p{1.2cm}p{1.0cm}p{1.0cm}p{1.0cm}p{1.2cm}p{1.0cm}@{}}
                 \toprule
-                \texttt{n\_pop} & \texttt{cxpb} & \texttt{mutpb} & \texttt{tourn\_size} & \texttt{n\_gen} \\
+                \texttt{pop\_size} & \texttt{cross\_prob} & \texttt{mut\_add} & \texttt{mut\_del} & \texttt{mut\_param} & \texttt{tourn\_size} & \texttt{n\_gen} \\
                 \midrule
-                Population size & Crossover probability & Mutation probability & Tournament size & Generations  \\
+                Population size & Crossover prob. & Add mutation & Del mutation & Param mutation & Tournament size & Generations  \\
                 \bottomrule
                 \end{tabular}
                 \label{tab:ga_param}
@@ -250,9 +251,9 @@ style=ieee,
             \item Variable parameters for PSO:
             \begin{table}[]
                 \tiny
-                \begin{tabular}{@{}p{1.5cm}p{1.2cm}p{1.2cm}p{1.2cm}p{1.5cm}@{}}
+                \begin{tabular}{@{}p{1.7cm}p{1.4cm}p{1.4cm}p{1.4cm}p{1.7cm}@{}}
                 \toprule
-                \texttt{n\_particles} & \texttt{intw} & $c_1$ & $c_2$ & \texttt{n\_iter} \\ \midrule
+                \texttt{swarm\_size} & \texttt{w} & $c_1$ & $c_2$ & \texttt{num\_iter} \\ \midrule
                 Swarm size & Inertia weight & Cognitive coefficient & Social coefficient & Iterations \\ \bottomrule
                 \end{tabular}
                 \label{tab:pso_param}
@@ -260,15 +261,35 @@ style=ieee,
             \item Variable parameters for SA:
             \begin{table}[]
                 \tiny
-                \begin{tabular}{@{}lll@{}}
+                \begin{tabular}{@{}p{1.8cm}p{1.5cm}p{1.5cm}@{}}
                 \toprule
-                $T_0$ & \texttt{cooling\_rate} & \texttt{max\_iter} \\ \midrule
+                \texttt{initial\_temp} & \texttt{cooling\_rate} & \texttt{max\_iter} \\ \midrule
                 Initial temperature & Cooling rate & Max. iterations \\ \bottomrule
                 \end{tabular}
                 \label{tab:sa_param}
             \end{table}
-            \item Other degrees of freedom include: the type of optimizer used in the neural network, learning rate used in training, type of crossover used in the (E)GA, choice of $r_1$ and $r_2$, etc.
-            \item Fixed parameters used in this work: \textcolor{red}{HAVE TO ADD THIS}
+            \item Other degrees of freedom include: the type of optimizer used in the neural network, learning rate used in training, type of crossover used in the GA, choice of $r_1$ and $r_2$, etc.
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}
+        \frametitle{Parametric Optimization - Fixed Parameters}
+        \begin{itemize}
+            \item General fixed parameters used in this work: 
+            \begin{itemize}
+                \item $\lambda_1 = 10^{-6}$ (parameter penalty)
+                \item $\lambda_2 = 1.0$ (accuracy weight)
+                \item \texttt{max\_layers} = 8
+                \item \texttt{epochs} = 3 (training) and 20 (evaluation)
+                \item \texttt{learning\_rate} = 0.001
+                \item \texttt{optimizer} = Adam with \texttt{weight\_decay} = $10^{-4}$
+            \end{itemize}
+            \item Algorithm-specific fixed parameters used in this work:
+            \begin{itemize}
+                \item GA: \texttt{pop\_size} = 40, \texttt{n\_gen} = 8
+                \item PSO: \texttt{swarm\_size} = 40, \texttt{num\_iter} = 30
+                \item SA: \texttt{max\_iter} = 1200
+            \end{itemize}
         \end{itemize}
     \end{frame}
 
@@ -278,9 +299,9 @@ style=ieee,
         {
             \small
             \begin{algorithmic}
-            \For{each algorithm $\in$ \{GA, EGA, PSO, SA\}}
+            \For{each algorithm $\in$ \{GA, PSO, SA\}}
                 \For{each parameter\_set $\in$ parameter\_combinations}
-                    \For{$k = 1$ to $5$}
+                    \For{$k = 1$ to $3$}
                         \State Split dataset into train/validation
                         \State Run algorithm with parameter\_set
                         \State Collect: best\_fitness, convergence\_time, final\_accuracy
@@ -292,7 +313,7 @@ style=ieee,
         \end{algorithmic}
         }
 
-        \textbf{Dataset Splits:}
+        \textbf{Dataset (CIFAR10) Splits:}
         \begin{itemize}
             \item Training: 60\% (Architecture search)
             \item Validation: 20\% (Fitness evaluation)
@@ -302,14 +323,17 @@ style=ieee,
 
     \begin{frame}
         \frametitle{Parametric Optimization - Genetic Algorithm}
+        \includegraphics[width=\linewidth]{figures/GA_simple_sensitivity.png}
     \end{frame}
 
     \begin{frame}
         \frametitle{Parametric Optimization - Particle Swarm Optimization}
+        \includegraphics[width=\linewidth]{figures/PSO_simple_sensitivity.png}
     \end{frame}
 
      \begin{frame}
     \frametitle{Parametric Optimization - Simulated Annealing}
+        \includegraphics[width=\linewidth]{figures/SA_simple_sensitivity.png}
     \end{frame}
 
     \section{Results}
@@ -318,16 +342,32 @@ style=ieee,
         \frametitle{Results}
     \end{frame}
 
-    \section{Future Work}
-
-    \begin{frame}
-        \frametitle{Future Work}
-    \end{frame}
-
     \section{Conclusion and Discussion}
 
     \begin{frame}
         \frametitle{Conclusion and Discussion}
+        \textcolor{red}{\textbf{PLEASE WRITE}}
+    \end{frame}
+
+    
+    \section{Future Work}
+
+    \begin{frame}
+        \frametitle{Future Work and Limitations}
+        \textbf{Current Limitations:}
+        \begin{itemize}
+            \item Limited to relatively simple architectures ($\leq$ 10 layers)
+            \item Training epochs are reduced for computational feasibility
+            \item Single-objective scalarization of multi-objective problem
+        \end{itemize}
+        \vspace{2mm}
+        \textbf{Future Extensions:}
+        \begin{itemize}
+            \item Generalize the approach to different datasets (graph, audio, video, etc)
+            \item Introduce more layers to be considered when constructing the NNs
+            \item Consider advanced components, such as attention, transformers, etc.
+            \item Leverage pre-trained components in search
+        \end{itemize}
     \end{frame}
 
     \begin{frame}[allowframebreaks]
