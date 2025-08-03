@@ -186,3 +186,7 @@ src/testing
 
 # Pickle
 *.pkl
+src/project/parametric_results/comprehensive_parametric_results.json
+src/project/parametric_results/GA_parametric_results.json
+src/project/parametric_results/PSO_parametric_results.json
+src/project/parametric_results/SA_parametric_results.json
