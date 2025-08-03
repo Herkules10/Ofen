@@ -1,0 +1,95 @@
+PARAMETRIC OPTIMIZATION SUMMARY REPORT
+============================================================
+
+Dataset: cifar10
+Device: cuda
+Runs per combination: 3
+Total optimization time: 80.0 hours
+
+
+GA OPTIMIZATION RESULTS
+----------------------------------------
+Total combinations tested: 243
+Successful combinations: 243
+Optimization time: 66.9 hours
+
+BEST PARAMETERS:
+  population_size: 40
+  crossover_prob: 0.5
+  mutation_add_prob: 0.3
+  mutation_del_prob: 0.2
+  mutation_param_prob: 0.1
+  tournament_size: 5
+  num_generations: 30
+  max_layers: 8
+
+BEST PERFORMANCE:
+  Average fitness: 47.8688
+  Average accuracy: 54.89%
+
+TOP 3 PARAMETER COMBINATIONS:
+
+1. Fitness: 47.8688, Accuracy: 54.89%
+   Parameters: {'population_size': 40, 'crossover_prob': 0.5, 'mutation_add_prob': 0.3, 'mutation_del_prob': 0.2, 'mutation_param_prob': 0.1, 'tournament_size': 5, 'num_generations': 30, 'max_layers': 8}
+
+2. Fitness: 47.5475, Accuracy: 55.95%
+   Parameters: {'population_size': 40, 'crossover_prob': 0.3, 'mutation_add_prob': 0.3, 'mutation_del_prob': 0.3, 'mutation_param_prob': 0.3, 'tournament_size': 5, 'num_generations': 30, 'max_layers': 8}
+
+3. Fitness: 47.5245, Accuracy: 55.61%
+   Parameters: {'population_size': 40, 'crossover_prob': 0.3, 'mutation_add_prob': 0.2, 'mutation_del_prob': 0.2, 'mutation_param_prob': 0.2, 'tournament_size': 5, 'num_generations': 30, 'max_layers': 8}
+
+PSO OPTIMIZATION RESULTS
+----------------------------------------
+Total combinations tested: 27
+Successful combinations: 27
+Optimization time: 11.2 hours
+
+BEST PARAMETERS:
+  swarm_size: 40
+  w: 0.4
+  c1: 2.5
+  c2: 2.0
+  num_iterations: 30
+  max_layers: 8
+
+BEST PERFORMANCE:
+  Average fitness: 49.7549
+  Average accuracy: 54.59%
+
+TOP 3 PARAMETER COMBINATIONS:
+
+1. Fitness: 49.7549, Accuracy: 54.59%
+   Parameters: {'swarm_size': 40, 'w': 0.4, 'c1': 2.5, 'c2': 2.0, 'num_iterations': 30, 'max_layers': 8}
+
+2. Fitness: 49.0572, Accuracy: 56.15%
+   Parameters: {'swarm_size': 40, 'w': 0.4, 'c1': 2.0, 'c2': 2.5, 'num_iterations': 30, 'max_layers': 8}
+
+3. Fitness: 48.9094, Accuracy: 53.25%
+   Parameters: {'swarm_size': 40, 'w': 0.4, 'c1': 2.5, 'c2': 1.5, 'num_iterations': 30, 'max_layers': 8}
+
+SA OPTIMIZATION RESULTS
+----------------------------------------
+Total combinations tested: 9
+Successful combinations: 9
+Optimization time: 1.9 hours
+
+BEST PARAMETERS:
+  initial_temperature: 100
+  cooling_rate: 0.95
+  max_iterations: 1200
+  max_layers: 8
+
+BEST PERFORMANCE:
+  Average fitness: 47.4537
+  Average accuracy: 52.53%
+
+TOP 3 PARAMETER COMBINATIONS:
+
+1. Fitness: 47.4537, Accuracy: 52.53%
+   Parameters: {'initial_temperature': 100, 'cooling_rate': 0.95, 'max_iterations': 1200, 'max_layers': 8}
+
+2. Fitness: 45.4631, Accuracy: 50.99%
+   Parameters: {'initial_temperature': 500, 'cooling_rate': 0.95, 'max_iterations': 1200, 'max_layers': 8}
+
+3. Fitness: 44.4627, Accuracy: 47.89%
+   Parameters: {'initial_temperature': 10, 'cooling_rate': 0.85, 'max_iterations': 1200, 'max_layers': 8}

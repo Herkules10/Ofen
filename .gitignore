@@ -183,3 +183,6 @@ report/*
 # project files
 src/project/data
 src/testing
+
+# Pickle
+*.pkl

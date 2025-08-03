@@ -165,27 +165,6 @@ style=ieee,
         }
     \end{frame}
 
-     % Slide 8a
-    \begin{frame}
-        \frametitle{Algorithms - Enhanced Genetic Algorithm}
-        \textbf{Enhanced Genetic Algorithm (EGA) \cite{shrestha_optimizing_2019}:} \\
-
-        {
-            \small
-            \vspace{2mm}
-            \textbf{Fitness function:} $-f(\alpha^{(i)}) = \lambda_1 \cdot \text{NetworkSize}(\alpha^{(i)}) - \lambda_2 \cdot \text{Accuracy}(\alpha^{(i)}, \mathcal{D})$
-
-
-            \vspace{2mm}
-            \textbf{Additional Features:}
-            \begin{itemize}
-                \item Preserve \texttt{n\_elite} best individuals each generation 
-                \item Adjust mutation rates based on population density 
-                \item Ensure architectural validity (e.g, Conv2D layers before FC layers)
-            \end{itemize}
-        }
-    \end{frame}
-
     % Slide 9
     \begin{frame}
         \frametitle{Algorithms - Particle Swarm Optimization}
@@ -259,11 +238,11 @@ style=ieee,
             \item Variable parameters for (E)GA:
             \begin{table}[h]
                 \tiny
-                \begin{tabular}{@{}p{1.5cm}p{1.2cm}p{1.2cm}p{1.2cm}p{1.2cm}p{1cm}@{}}
+                \begin{tabular}{@{}p{1.5cm}p{1.2cm}p{1.2cm}p{1.2cm}p{1.2cm}@{}}
                 \toprule
-                \texttt{n\_pop} & \texttt{cxpb} & \texttt{mutpb} & \texttt{tourn\_size} & \texttt{n\_gen} & \texttt{n\_elite} \\
+                \texttt{n\_pop} & \texttt{cxpb} & \texttt{mutpb} & \texttt{tourn\_size} & \texttt{n\_gen} \\
                 \midrule
-                Population size & Crossover probability & Mutation probability & Tournament size & Generations & Elite size \\
+                Population size & Crossover probability & Mutation probability & Tournament size & Generations  \\
                 \bottomrule
                 \end{tabular}
                 \label{tab:ga_param}
