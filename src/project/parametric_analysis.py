@@ -120,11 +120,19 @@ class EnhancedParametricAnalyzer:
         
         # Create parameter sensitivity plot grid
         n_params = len(varying_params)
-        n_cols = min(2, n_params)  # Maximum 2 columns
-        n_rows = (n_params + n_cols - 1) // n_cols
         
-        fig, axes = plt.subplots(n_rows, n_cols, figsize=(12, 5*n_rows))
-        fig.suptitle(f'{algorithm} Parameter Sensitivity Analysis', fontsize=16, y=0.98)
+        # Special layout for GA: 3x2 (3 in upper row, 2 in lower row)
+        if algorithm == 'GA' and n_params == 5:
+            n_cols = 3
+            n_rows = 2
+            fig, axes = plt.subplots(n_rows, n_cols, figsize=(15, 8))
+        else:
+            # For other algorithms or different parameter counts: single row
+            n_cols = min(n_params, n_params)  # All parameters in one row
+            n_rows = 1
+            fig, axes = plt.subplots(n_rows, n_cols, figsize=(4*n_params, 5))
+        
+        # Removed main title to focus on individual subplot titles
         
         # Ensure axes is always indexable as a flat array
         if n_params == 1:
@@ -140,13 +148,16 @@ class EnhancedParametricAnalyzer:
             # Create simple sensitivity plot for this parameter
             self._plot_parameter_sensitivity_lines(ax, df, param, param_ranges, algorithm)
         
-        # Remove empty subplots
-        if n_params < len(axes):
+        # Remove empty subplots (especially for GA 3x2 layout with 5 parameters)
+        if algorithm == 'GA' and n_params == 5 and len(axes) == 6:
+            # Remove the last subplot (bottom right) for GA with 5 parameters
+            axes[5].remove()
+        elif n_params < len(axes):
             for i in range(n_params, len(axes)):
                 axes[i].remove()
         
         plt.tight_layout()
-        plt.subplots_adjust(top=0.93)
+        # No need to adjust for suptitle spacing anymore
         plt.savefig(self.output_dir / f'{algorithm}_simple_sensitivity.png', 
                    dpi=300, bbox_inches='tight', facecolor='white')
         plt.close()
