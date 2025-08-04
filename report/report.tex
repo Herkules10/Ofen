@@ -113,7 +113,7 @@ sorting=none
             \item Investigate how \textbf{Genetic Algorithms (GA)}, \textbf{Particle Swarm Optimization (PSO)}, and \textbf{Simulated Annealing (SA)} perform when applied to the problem.
             \item Balance the trade-off between network size and accuracy
             \item Evaluate the effectiveness of different layer types in automated architecture design
-            \item Assess the performance of these algorithms by comparing them to baseline methods, such as \textbf{Random Search (RS)} and \textbf{Grid Search (GS)}.
+            \item Assess the performance of these algorithms by comparing them to baseline methods, such as \textbf{Random Search (RS)}
             \item Assess the performance of the algorithms across different dataset complexities
         \end{itemize}
     \end{frame}
@@ -134,14 +134,6 @@ sorting=none
             \item Return $(\alpha^{(best, RS)}, f(\alpha^{(best, RS)}))$ with $f(\alpha^{(best, RS)}) \geq f(\alpha^{(i)}), \forall \alpha^{(i)}$
         \end{enumerate}}
         \vspace{2mm}
-        \textbf{Grid Search (GS)} \\
-        {\small
-            \textbf{Cost function:} $f(\alpha^{(i)}) = \lambda_2 \cdot \text{Accuracy}(\alpha^{(i)}, \mathcal{D}) - \lambda_1 \cdot \text{NetworkSize}(\alpha^{(i)})$ 
-            \begin{enumerate}
-                \item Define systematic grid over architecture hyperparameters 
-                \item Evaluate $f(\alpha^{(i)})$ for each grid point $\alpha^{(i)}$
-                \item Return $(\alpha^{(best, GS)}, f(\alpha^{(best, GS)}))$ with maximal fitness
-            \end{enumerate}}
     \end{frame}
 
     % Slide 7
@@ -368,6 +360,7 @@ sorting=none
             GA & 97.2\% & 213k & 95.412 & 7.2 \\
             PSO & 97.5\% & 146k & 97.354 & 14.3 \\
             SA & 96.0\% & 27k & 94.191 & 18.2 \\
+            RS & 91.9\% & 29k & 91.581 & 16.6 \\
             \hline
             \end{tabular}
             \caption{Algorithm Performance Comparison on MNIST}
@@ -382,7 +375,7 @@ sorting=none
     \end{frame}
 
     \begin{frame}
-        \frametitle{Overview (CIFAR10)}
+        \frametitle{Results - Overview (CIFAR10)}
         \begin{table}[htbp]
             \centering
             \begin{tabular}{|l|c|c|c|c|}
@@ -392,7 +385,7 @@ sorting=none
             GA & 55.4\% & 703k & 45.704 & 9.4 \\
             PSO & 54.5\% & 56k & 50.413 & 16.2 \\
             SA & 50.3\% & 17k & 46.858 & 25.2 \\
-            Random & 45.8\% & 84k & 43.219 & 18.3 \\
+            RS & 45.8\% & 84k & 43.219 & 18.3 \\
             \hline
             \end{tabular}
              \caption{Algorithm Performance Comparison on CIFAR10}
@@ -401,7 +394,7 @@ sorting=none
         \begin{itemize}
             \item The test accuracy is rather disappointing with the best accuracy being 55.4\%
             \item The most accurate model is produced GA 
-            \item In this case, the most accurate model is also the largest (703k)
+            \item In this case, the most accurate model is also the largest (703k parameters)
             \item Runtime higher than MNIST, which was to be expected, as CIFAR10 is a larger dataset
         \end{itemize}
     \end{frame}
@@ -481,7 +474,7 @@ sorting=none
             \begin{itemize}
                 \item Crossover seems to have a negative influence
                 \item More chance to add layers has a positive effect. 
-                \item This two things are to be expected, since larger networks should perform better
+                \item These two things are to be expected, since larger networks should perform better
             \end{itemize}
             \item \textbf{Particle Swarm Optimization (PSO):}
             \begin{itemize}
@@ -490,9 +483,10 @@ sorting=none
             \item \textbf{Simulated Annealing (SA):}
             \begin{itemize}
                 \item SA performed the worst and can also not be parallelized like the other algorithms.
+                \item A slower cooling rate seems to improve performance
                 \item We would not recommend using SA to optimize neural network architectures.
             \end{itemize}
-            \item Experiments were overall success and improvement over simpler methods such as Random Search and Grid Search
+            \item Experiments were overall success and improvement over simpler methods such as Random Search (RS)
             \item CIFAR10 results were rather disappointing, but the MNIST results were good
         \end{itemize}
     \end{frame}
