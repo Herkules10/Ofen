@@ -28,6 +28,7 @@ class ResultsVisualizer:
         # Load all results
         self.results = self._load_all_results()
         self.summary_data = self._load_summary_data()
+        self.baseline_data = self._load_baseline_data()
     
     def _get_algorithm_colors(self, algorithms: List[str]) -> List[str]:
         """Get consistent colors for algorithms."""
@@ -36,10 +37,12 @@ class ResultsVisualizer:
             'EGA': '#FF6B6B',   # Red (same as GA) 
             'PSO': '#4ECDC4',   # Teal/Green
             'SA': "#2F00FF",    # Blue
-            'ASA': "#7700FF"    # Light Green
+            'ASA': "#7700FF",   # Purple
+            'Random Search': '#888888',  # Gray for baseline
+            'RS': '#888888'     # Gray for baseline (alternative name)
         }
         
-        distinct_colors = ['#FF6B6B', '#4ECDC4', "#1100FF"]
+        distinct_colors = ['#FF6B6B', '#4ECDC4', "#1100FF", '#888888']
         colors = []
         for alg in algorithms:
             if alg in color_map:
@@ -67,6 +70,19 @@ class ResultsVisualizer:
                 return pickle.load(f)
         return {}
     
+    def _load_baseline_data(self) -> Dict:
+        """Load baseline results if available."""
+        baseline_files = list(self.results_dir.glob("baseline_*.pkl"))
+        if baseline_files:
+            print(f"Found baseline file: {baseline_files[0]}")
+            with open(baseline_files[0], 'rb') as f:
+                baseline_data = pickle.load(f)
+                # Ensure consistent naming
+                if 'algorithm' not in baseline_data:
+                    baseline_data['algorithm'] = 'Random Search'
+                return baseline_data
+        return {}
+    
     def create_all_plots(self):
         """Generate all visualization plots."""
         print("Generating all plots...")
@@ -87,6 +103,10 @@ class ResultsVisualizer:
         # New: Fitness evaluation progress plot
         self.plot_fitness_evaluation_progress()
         
+        # New: Baseline comparison plot
+        if self.baseline_data:
+            self.plot_baseline_comparison()
+        
         print(f"All plots saved to: {self.output_dir}")
     
     def plot_performance_comparison(self):
@@ -103,8 +123,19 @@ class ResultsVisualizer:
         fitnesses = [self.summary_data[alg]['best_fitness']['mean'] for alg in algorithms]
         fitness_stds = [self.summary_data[alg]['best_fitness']['std'] for alg in algorithms]
         
+        # Add baseline if available
+        if self.baseline_data:
+            algorithms.append(self.baseline_data.get('algorithm', 'Random Search'))
+            accuracies.append(self.baseline_data['test_accuracy'])
+            accuracy_stds.append(0)  # Single run, no std
+            fitnesses.append(self.baseline_data['best_fitness'])
+            fitness_stds.append(0)
+        
+        # Get colors including baseline
+        colors = self._get_algorithm_colors(algorithms)
+        
         # Test accuracy plot
-        bars1 = ax1.bar(algorithms, accuracies, yerr=accuracy_stds, capsize=5, alpha=0.8)
+        bars1 = ax1.bar(algorithms, accuracies, yerr=accuracy_stds, capsize=5, alpha=0.8, color=colors)
         ax1.set_ylabel('Test Accuracy (%)')
         ax1.set_title('Test Accuracy Comparison')
         ax1.set_ylim(0, max(accuracies) * 1.1)
@@ -116,7 +147,7 @@ class ResultsVisualizer:
                     f'{acc:.1f}%', ha='center', va='bottom')
         
         # Fitness comparison plot
-        bars2 = ax2.bar(algorithms, fitnesses, yerr=fitness_stds, capsize=5, alpha=0.8)
+        bars2 = ax2.bar(algorithms, fitnesses, yerr=fitness_stds, capsize=5, alpha=0.8, color=colors)
         ax2.set_ylabel('Fitness Score')
         ax2.set_title('Fitness Score Comparison')
         
@@ -138,6 +169,12 @@ class ResultsVisualizer:
         algorithms = list(self.summary_data.keys())
         accuracies = [self.summary_data[alg]['test_accuracy']['mean'] for alg in algorithms]
         param_counts = [self.summary_data[alg]['parameter_count']['mean'] / 1000 for alg in algorithms]  # in thousands
+        
+        # Add baseline if available
+        if self.baseline_data:
+            algorithms.append(self.baseline_data.get('algorithm', 'Random Search'))
+            accuracies.append(self.baseline_data['test_accuracy'])
+            param_counts.append(self.baseline_data['parameter_count'] / 1000)
         
         # Use consistent colors
         colors = self._get_algorithm_colors(algorithms)
@@ -246,6 +283,12 @@ class ResultsVisualizer:
                                mean_convergence - std_convergence,
                                mean_convergence + std_convergence,
                                alpha=0.2, color=colors[i])
+        
+        # Add baseline horizontal line if available
+        if self.baseline_data:
+            baseline_fitness = self.baseline_data['best_fitness']
+            ax.axhline(y=baseline_fitness, color='#888888', linestyle='--', 
+                      linewidth=2, label='Random Search', alpha=0.8)
         
         ax.set_xlabel('Number of Evaluations')
         ax.set_ylabel('Best Fitness Achieved So Far')
@@ -519,6 +562,69 @@ class ResultsVisualizer:
         
         print(f"Individual fitness evaluation progress plots saved for {len(self.results)} algorithms")
     
+    def plot_baseline_comparison(self):
+        """Create a dedicated baseline comparison visualization."""
+        if not self.baseline_data or not self.summary_data:
+            return
+        
+        fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(15, 12))
+        
+        # Get all algorithms including baseline
+        algorithms = list(self.summary_data.keys()) + [self.baseline_data.get('algorithm', 'Random Search')]
+        accuracies = [self.summary_data[alg]['test_accuracy']['mean'] for alg in self.summary_data.keys()] + [self.baseline_data['test_accuracy']]
+        param_counts = [self.summary_data[alg]['parameter_count']['mean'] / 1000 for alg in self.summary_data.keys()] + [self.baseline_data['parameter_count'] / 1000]
+        fitnesses = [self.summary_data[alg]['best_fitness']['mean'] for alg in self.summary_data.keys()] + [self.baseline_data['best_fitness']]
+        runtimes = [self.summary_data[alg]['runtime']['mean'] / 3600 for alg in self.summary_data.keys()] + [self.baseline_data.get('runtime', 0) / 3600]
+        
+        colors = self._get_algorithm_colors(algorithms)
+        
+        # Accuracy comparison
+        bars1 = ax1.bar(algorithms, accuracies, color=colors, alpha=0.8)
+        ax1.set_ylabel('Test Accuracy (%)')
+        ax1.set_title('Test Accuracy: Metaheuristics vs Random Search')
+        ax1.tick_params(axis='x', rotation=45)
+        for bar, acc in zip(bars1, accuracies):
+            height = bar.get_height()
+            ax1.text(bar.get_x() + bar.get_width()/2., height + 0.5,
+                    f'{acc:.1f}%', ha='center', va='bottom')
+        
+        # Parameter efficiency scatter
+        for i, (alg, acc, params) in enumerate(zip(algorithms, accuracies, param_counts)):
+            marker = 's' if 'Random' in alg else 'o'  # Square for baseline, circle for others
+            size = 200 if 'Random' in alg else 150
+            ax2.scatter(params, acc, s=size, c=colors[i], label=alg, alpha=0.8, marker=marker)
+        ax2.set_xlabel('Parameter Count (thousands)')
+        ax2.set_ylabel('Test Accuracy (%)')
+        ax2.set_title('Parameter Efficiency Comparison')
+        ax2.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+        ax2.grid(True, alpha=0.3)
+        
+        # Fitness comparison
+        bars3 = ax3.bar(algorithms, fitnesses, color=colors, alpha=0.8)
+        ax3.set_ylabel('Fitness Score')
+        ax3.set_title('Fitness Score Comparison')
+        ax3.tick_params(axis='x', rotation=45)
+        for bar, fit in zip(bars3, fitnesses):
+            height = bar.get_height()
+            ax3.text(bar.get_x() + bar.get_width()/2., height + 0.1,
+                    f'{fit:.3f}', ha='center', va='bottom')
+        
+        # Runtime comparison
+        bars4 = ax4.bar(algorithms, runtimes, color=colors, alpha=0.8)
+        ax4.set_ylabel('Runtime (hours)')
+        ax4.set_title('Runtime Comparison')
+        ax4.tick_params(axis='x', rotation=45)
+        for bar, runtime in zip(bars4, runtimes):
+            height = bar.get_height()
+            ax4.text(bar.get_x() + bar.get_width()/2., height + 0.05,
+                    f'{runtime:.1f}h', ha='center', va='bottom')
+        
+        plt.tight_layout()
+        plt.savefig(self.output_dir / 'baseline_comparison.png', dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        print("Baseline comparison plot saved")
+    
     def create_summary_table(self):
         """Create a summary table of results."""
         if not self.summary_data:
@@ -543,6 +649,17 @@ class ResultsVisualizer:
             latex_table += f"{alg} & {acc_mean:.1f} ± {acc_std:.1f} & "
             latex_table += f"{param_mean:.0f}k & {fitness_mean:.3f} & {runtime_mean:.1f} \\\\\n"
         
+        # Add baseline if available
+        if self.baseline_data:
+            baseline_name = self.baseline_data.get('algorithm', 'Random Search')
+            acc = self.baseline_data['test_accuracy']
+            param = self.baseline_data['parameter_count'] / 1000
+            fitness = self.baseline_data['best_fitness']
+            runtime = self.baseline_data.get('runtime', 0) / 3600
+            
+            latex_table += f"{baseline_name} & {acc:.1f} & "
+            latex_table += f"{param:.0f}k & {fitness:.3f} & {runtime:.1f} \\\\\n"
+        
         latex_table += "\\hline\n"
         latex_table += "\\end{tabular}\n"
         latex_table += "\\label{tab:results}\n"
@@ -562,8 +679,10 @@ def main():
                         help='Output directory for plots')
     parser.add_argument('--plots', nargs='+',
                         choices=['performance', 'efficiency', 'convergence', 'fitness', 
-                                'runtime', 'architecture', 'individual', 'progress', 'all'],
+                                'runtime', 'architecture', 'individual', 'progress', 'baseline', 'all'],
                         default=['all'], help='Which plots to generate')
+    parser.add_argument('--include_baseline', action='store_true',
+                        help='Include baseline comparisons in plots (will be detected automatically if baseline files exist)')
     
     args = parser.parse_args()
     
@@ -596,6 +715,8 @@ def main():
             visualizer.plot_individual_convergence()
         if 'progress' in args.plots:
             visualizer.plot_fitness_evaluation_progress()
+        if 'baseline' in args.plots and visualizer.baseline_data:
+            visualizer.plot_baseline_comparison()
     
     print("Visualization complete!")
 

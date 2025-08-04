@@ -358,7 +358,7 @@ sorting=none
     \section{Results}
 
     \begin{frame}
-        \frametitle{Results - Overview}
+        \frametitle{Results - Overview (MNIST)}
         \begin{table}[htbp]
             \centering
             \begin{tabular}{|l|c|c|c|c|}
@@ -382,31 +382,91 @@ sorting=none
     \end{frame}
 
     \begin{frame}
-        \frametitle{Results - Convergence}
+        \frametitle{Overview (CIFAR10)}
+        \begin{table}[htbp]
+            \centering
+            \begin{tabular}{|l|c|c|c|c|}
+            \hline
+            Algorithm & Test Accuracy (\%) & Parameters & Fitness & Runtime (min) \\
+            \hline
+            GA & 55.4\% & 703k & 45.704 & 9.4 \\
+            PSO & 54.5\% & 56k & 50.413 & 16.2 \\
+            SA & 50.3\% & 17k & 46.858 & 25.2 \\
+            Random & 45.8\% & 84k & 43.219 & 18.3 \\
+            \hline
+            \end{tabular}
+             \caption{Algorithm Performance Comparison on CIFAR10}
+            \label{tab:results2}
+        \end{table}
+        \begin{itemize}
+            \item The test accuracy is rather disappointing with the best accuracy being 55.4\%
+            \item The most accurate model is produced GA 
+            \item In this case, the most accurate model is also the largest (703k)
+            \item Runtime higher than MNIST, which was to be expected, as CIFAR10 is a larger dataset
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}
+        \frametitle{Results - Convergence (MNIST)}
         \begin{columns}
-            \begin{column}{0.6\textwidth}
+            \begin{column}{0.65\textwidth}
                 \includegraphics[width=\linewidth]{figures/convergence_curves.png}
             \end{column}
-            \begin{column}{0.4\textwidth}
+            \begin{column}{0.35\textwidth}
                 \begin{itemize}
-                    \item GA shows rapid initial convergence but plateaus early
+                    \item GA shows steady convergence but plateaus early on
                     \item PSO demonstrates steady improvement throughout iterations
-                    \item SA exhibits characteristic cooling behavior with gradual convergence
-                    \item All algorithms converge within computational budget
+                    \item SA convergence really quickly and remains at a plateau
+                    \item Again, all algorithms converge within computational budget
                 \end{itemize}
             \end{column}
         \end{columns}
     \end{frame}
 
     \begin{frame}
-        \frametitle{Results - Fitness Evaluation}
+        \frametitle{Results - Convergence (CIFAR10)}
         \begin{columns}
-            \begin{column}{0.6\textwidth}
+            \begin{column}{0.65\textwidth}
+                \includegraphics[width=\linewidth]{figures/convergence_curves_cifar10.png}
+            \end{column}
+            \begin{column}{0.35\textwidth}
+                \begin{itemize}
+                    \item GA shows steady converges but plateaus early on
+                    \item PSO demonstrates steady improvement throughout iterations
+                    \item SA exhibits characteristic cooling behavior with gradual convergence
+                    \item Again, all algorithms converge within computational budget
+                \end{itemize}
+            \end{column}
+        \end{columns}
+    \end{frame}
+
+
+    \begin{frame}
+        \frametitle{Results - Fitness Evaluation (MNIST)}
+        \begin{columns}
+            \begin{column}{0.65\textwidth}
                 \includegraphics[width=\linewidth]{figures/fitness_evaluation_progress_combined.png}
             \end{column}
-            \begin{column}{0.4\textwidth}
+            \begin{column}{0.35\textwidth}
                 \begin{itemize}
-                    \item meow
+                   \item PSO converges to one swarm very quickly 
+                    \item Quite a few invalid architecture edge cases at 0 fitness
+                \end{itemize}
+            \end{column}
+        \end{columns}
+    \end{frame}  
+    
+    \begin{frame}
+        \frametitle{Results - Fitness Evaluation (CIFAR10)}
+        \begin{columns}
+            \begin{column}{0.65\textwidth}
+                \includegraphics[width=\linewidth]{figures/fitness_evaluation_progress_combined_cifar.png}
+            \end{column}
+            \begin{column}{0.35\textwidth}
+                \begin{itemize}
+                   \item Again, PSO converges to one swarm very quickly 
+                \item Quite a few invalid architecture edge cases at 0 fitness
+                \item SA "collapses" for a while and bounces back again
                 \end{itemize}
             \end{column}
         \end{columns}
@@ -415,13 +475,13 @@ sorting=none
     \section{Conclusion and Discussion}
 
     \begin{frame}
-        \frametitle{Conclusion and Discussion}
+        \frametitle{Discussion}
         \begin{itemize}
             \item \textbf{Genetic Algorithm (GA):}
             \begin{itemize}
                 \item Crossover seems to have a negative influence
                 \item More chance to add layers has a positive effect. 
-                \item $\implies$ To be expected, since larger networks should perform better
+                \item This two things are to be expected, since larger networks should perform better
             \end{itemize}
             \item \textbf{Particle Swarm Optimization (PSO):}
             \begin{itemize}
@@ -433,6 +493,19 @@ sorting=none
                 \item We would not recommend using SA to optimize neural network architectures.
             \end{itemize}
             \item Experiments were overall success and improvement over simpler methods such as Random Search and Grid Search
+            \item CIFAR10 results were rather disappointing, but the MNIST results were good
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}
+        \frametitle{Conclusion}
+        \begin{itemize}
+            \small
+            \item The architecture of neural networks for a specific dataset was successfully optimized using a genetic algorithm, particle swarm optimization and simulated annealing
+            \item A hyperparameter search was conducted and we conclude that the optimization of neural networks seems quite robust to hyperparameter changes in the optimization algorithms
+            \item Particle swarm optimization and genetic algorithms present promising pathways to optimize neural network architecture, while simulated annealing seems less promising, especially for larger experiments, as it can't be parallelized
+            \item While these results were promising, the immense compute cost severely limits the types of applications these optimization methods could be applied to given current compute limitations
+            \item We think the optimization of neural network architecture makes the most sense for somewhat simple problems that require both accuracy and a short inference time, such as collision avoidance for drones
         \end{itemize}
     \end{frame}
 

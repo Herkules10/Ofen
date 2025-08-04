@@ -415,7 +415,7 @@ def main():
         if args.include_baseline:
             print(f"{'Random':<12} "
                   f"{baseline_result['test_accuracy']:.2f}          "
-                  f"{baseline_result['parameter_count']:.0f:<12} "
+                  f"{baseline_result['parameter_count']:<12.0f} "
                   f"{'N/A':<12} "
                   f"{baseline_result['best_fitness']:.4f}")
         
