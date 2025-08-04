@@ -8,6 +8,8 @@
 \usepackage[
 backend=bibtex,
 style=ieee,
+citestyle=numeric-comp,
+sorting=none
 ]{biblatex}
 
 \addbibresource{references.bib}
@@ -72,7 +74,10 @@ style=ieee,
     \begin{frame}
         \frametitle{Introduction - Motivation}
         \begin{itemize}
-            \item \textbf{Motivation} (Optimization of NNA): \textcolor{red}{Please write :)} \cite{idrissi_genetic_2016}
+            \item For $L$ maximum layers and $C$ component types, exhaustive search requires $\mathcal{O}(C^L)$ evaluations
+            \item \textbf{Consequence:} Analytical methods become computationally unviable
+            \item \textbf{Solution:} Metaheuristic algorithms (GA, PSO, SA) provide more efficient exploration \cite{idrissi_genetic_2016,kuo_neural_2022,jamous_neural_2021,carvalho_particle_2007,shrestha_optimizing_2019}
+            \item \textbf{Expansion:} Consider more layers such as Conv1D/Conv2D, that were not considered in the related work
         \end{itemize}
     \end{frame}
 
@@ -324,16 +329,28 @@ style=ieee,
     \begin{frame}
         \frametitle{Parametric Optimization - Genetic Algorithm}
         \includegraphics[width=\linewidth]{figures/GA_simple_sensitivity.png}
+        \vspace{-5mm}
+        \begin{itemize}
+            \item In conclusion, the following values were chosen: \texttt{cross\_prob} = 0.3, \texttt{mut\_add} = 0.3, \texttt{mut\_del} = 0.2, \texttt{mut\_param} = 0.2, \texttt{tourn\_size} = 5
+        \end{itemize}
     \end{frame}
 
     \begin{frame}
         \frametitle{Parametric Optimization - Particle Swarm Optimization}
         \includegraphics[width=\linewidth]{figures/PSO_simple_sensitivity.png}
+        \begin{itemize}
+            \item In conclusion, the following values were chosen: \texttt{w} = 0.4, \texttt{c1} = 2.5, \texttt{c2} = 2.0
+        \end{itemize}
     \end{frame}
 
      \begin{frame}
     \frametitle{Parametric Optimization - Simulated Annealing}
-        \includegraphics[width=\linewidth]{figures/SA_simple_sensitivity.png}
+        \begin{center}
+            \includegraphics[width=.8\linewidth]{figures/SA_simple_sensitivity.png}
+        \end{center}
+        \begin{itemize}
+            \item In conclusion, the following values were chosen: \texttt{initial\_temp} = 100, \texttt{cooling\_rate} = 0.95
+        \end{itemize}
     \end{frame}
 
     \section{Results}
