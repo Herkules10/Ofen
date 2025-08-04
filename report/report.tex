@@ -291,7 +291,7 @@ sorting=none
             \end{itemize}
             \item Algorithm-specific fixed parameters used in this work:
             \begin{itemize}
-                \item GA: \texttt{pop\_size} = 40, \texttt{n\_gen} = 8
+                \item GA: \texttt{pop\_size} = 40, \texttt{n\_gen} = 30
                 \item PSO: \texttt{swarm\_size} = 40, \texttt{num\_iter} = 30
                 \item SA: \texttt{max\_iter} = 1200
             \end{itemize}
@@ -318,7 +318,7 @@ sorting=none
         \end{algorithmic}
         }
 
-        \textbf{Dataset (CIFAR10) Splits:}
+        \textbf{Dataset (CIFAR10 / MNIST) Splits:}
         \begin{itemize}
             \item Training: 60\% (Architecture search)
             \item Validation: 20\% (Fitness evaluation)
@@ -328,7 +328,9 @@ sorting=none
 
     \begin{frame}
         \frametitle{Parametric Optimization - Genetic Algorithm}
-        \includegraphics[width=\linewidth]{figures/GA_simple_sensitivity.png}
+        \begin{center}
+            \includegraphics[width=\linewidth]{figures/GA_simple_sensitivity.png}
+        \end{center}
         \vspace{-5mm}
         \begin{itemize}
             \item In conclusion, the following values were chosen: \texttt{cross\_prob} = 0.3, \texttt{mut\_add} = 0.3, \texttt{mut\_del} = 0.2, \texttt{mut\_param} = 0.2, \texttt{tourn\_size} = 5
@@ -356,14 +358,82 @@ sorting=none
     \section{Results}
 
     \begin{frame}
-        \frametitle{Results}
+        \frametitle{Results - Overview}
+        \begin{table}[htbp]
+            \centering
+            \begin{tabular}{|l|c|c|c|c|}
+            \hline
+            Algorithm & Test Accuracy (\%) & Parameters & Fitness & Runtime (min) \\
+            \hline
+            GA & 97.2\% & 213k & 95.412 & 7.2 \\
+            PSO & 97.5\% & 146k & 97.354 & 14.3 \\
+            SA & 96.0\% & 27k & 94.191 & 18.2 \\
+            \hline
+            \end{tabular}
+            \caption{Algorithm Performance Comparison on MNIST}
+            \label{tab:results}
+        \end{table}
+        \begin{itemize}
+            \item All of the tested algorithms show promising results, with a test accuracy of $\geq 96\%$
+            \item The most accurate model was produced by PSO
+            \item However the most accurate model is not the largest model (146k vs. 213k parameters)
+            \item The runtime of both GA and PSO is lower than SA, as they both could be easily implemented with parallelization in mind
+        \end{itemize}
     \end{frame}
+
+    \begin{frame}
+        \frametitle{Results - Convergence}
+        \begin{columns}
+            \begin{column}{0.6\textwidth}
+                \includegraphics[width=\linewidth]{figures/convergence_curves.png}
+            \end{column}
+            \begin{column}{0.4\textwidth}
+                \begin{itemize}
+                    \item GA shows rapid initial convergence but plateaus early
+                    \item PSO demonstrates steady improvement throughout iterations
+                    \item SA exhibits characteristic cooling behavior with gradual convergence
+                    \item All algorithms converge within computational budget
+                \end{itemize}
+            \end{column}
+        \end{columns}
+    \end{frame}
+
+    \begin{frame}
+        \frametitle{Results - Fitness Evaluation}
+        \begin{columns}
+            \begin{column}{0.6\textwidth}
+                \includegraphics[width=\linewidth]{figures/fitness_evaluation_progress_combined.png}
+            \end{column}
+            \begin{column}{0.4\textwidth}
+                \begin{itemize}
+                    \item meow
+                \end{itemize}
+            \end{column}
+        \end{columns}
+    \end{frame}        
 
     \section{Conclusion and Discussion}
 
     \begin{frame}
         \frametitle{Conclusion and Discussion}
-        \textcolor{red}{\textbf{PLEASE WRITE}}
+        \begin{itemize}
+            \item \textbf{Genetic Algorithm (GA):}
+            \begin{itemize}
+                \item Crossover seems to have a negative influence
+                \item More chance to add layers has a positive effect. 
+                \item $\implies$ To be expected, since larger networks should perform better
+            \end{itemize}
+            \item \textbf{Particle Swarm Optimization (PSO):}
+            \begin{itemize}
+                \item PSO consistently performed the best for this task across most experiments and is not very volatile to parameter changes.
+            \end{itemize}
+            \item \textbf{Simulated Annealing (SA):}
+            \begin{itemize}
+                \item SA performed the worst and can also not be parallelized like the other algorithms.
+                \item We would not recommend using SA to optimize neural network architectures.
+            \end{itemize}
+            \item Experiments were overall success and improvement over simpler methods such as Random Search and Grid Search
+        \end{itemize}
     \end{frame}
 
     
@@ -376,6 +446,7 @@ sorting=none
             \item Limited to relatively simple architectures ($\leq$ 10 layers)
             \item Training epochs are reduced for computational feasibility
             \item Single-objective scalarization of multi-objective problem
+            \item Runtime of certain approaches became infeasible very quickly
         \end{itemize}
         \vspace{2mm}
         \textbf{Future Extensions:}

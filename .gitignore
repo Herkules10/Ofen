@@ -179,6 +179,7 @@ report/*
 !report.pdf 
 !report.tex
 !references.bib
+!report/figures
 
 # project files
 src/project/data
